@@ -9,7 +9,7 @@ library('RColorBrewer')
 library('WGCNA')
 library(igraph)
 
-load(".RData")
+?cutload(".RData")
 class(ppi_1); head(ppi_1)
 
 working_ppi1 = ppi_1

@@ -16,7 +16,7 @@ file_names = paste(download_path,"/",downloaded_folder,"/",list.files(downloaded
 
 ## ---- Log in Synapse Server ------------------------------
 library(synapseClient)
-synapseLogin(username = '...',password = '...')
+synapseLogin(username = 'duc.do',password = 'LZKn5nssaa')
 
 ## ----  Sub-challenge 1  ------------------------------------
 
