@@ -244,16 +244,6 @@ length(cliq) # [1] 58424 ==> toal number of cliq whose size is at least 5 is 584
 
 # create a vector whose element is each clique's size in the list "cliq" 
 cliq_sizes = sapply(cliq, function(vertices) length(vertices))
-# name the vector cliq_size by the cliq index order 
-names(cliq_sizes) = 1:length(cliq_sizes)
-# reorder the names based on the decreasing order of the size
-order_by_size = as.numeric(names(sort(cliq_sizes,decreasing = TRUE)))
-# if it works, the first element in the new name should indicate the largest clique
-cliq_sizes[order_by_size[1]] # return 73 --> checked!
-# reorder the clique by new order
-cliq_ordered_by_size = cliq[order_by_size]
-
-plot(sapply(cliq_ordered_by_size, function(vertices) length(vertices)))
 
 cliq_names = lapply(cliq, function(vertices) names(vertices))
 cliq_names_ul = unlist(cliq_names)
@@ -261,8 +251,6 @@ length(cliq_sizes) # [1] 58424 ==> just to check!
 save(cliq, file="cliques2_sub.RData")
 
 table(cliq_sizes)
-
-
 
 # cliq_sizes
 # 5    6    7    8    9   10   11   12   13   14   15   16   17   18   19   20   21   22   23   24   25   26   27 
@@ -276,13 +264,24 @@ summary(cliq_sizes)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 5.0     8.0    18.0    19.8    28.0    73.0 
 
+# name the vector cliq_size by the cliq index order 
+names(cliq_sizes) = 1:length(cliq_sizes)
+# reorder the names based on the decreasing order of the size
+order_by_size = as.numeric(names(sort(cliq_sizes,decreasing = TRUE)))
+# if it works, the first element in the new name should indicate the largest clique
+cliq_sizes[order_by_size[1]] # return 73 --> checked!
+# reorder the clique by new order
+cliq_ordered_by_size = cliq[order_by_size]
+# plot to check
+plot(sapply(cliq_ordered_by_size, function(vertices) length(vertices)))
 
 
 # create membership_clique which says which clique
 # each vertex belongs to
 membership_clique = numeric(length = length(V(pp2_igraph)))
 names(membership_clique) = V(pp2_igraph)$name
-
+membership_clique2 = numeric(length = length(V(pp2_igraph)))
+names(membership_clique2) = V(pp2_igraph)$name
 # clique labels will be c
 c = 1
 for (i in 1:10000) {
@@ -298,6 +297,21 @@ for (i in 1:10000) {
   }
 }
 
+c= 1
+for (i in 1:length(cliq)) {
+  # a clique
+  cCliq = cliq_ordered_by_size[[i]]
+  # vertex in clique
+  idx = V(pp2_igraph)$name[cCliq]
+  # if none of the members of this clique are already in a clique
+  if (sum(membership_clique2[idx]) == 0 ) {
+    # the members of this clique are in group c
+    membership_clique2[idx] = c
+    c = c + 1
+  }
+}
+
+
 #anything not in a clique is in it's own group
 max_membership = max(membership_clique)+1
 for (i in 1:length(V(pp2_igraph))){
@@ -307,11 +321,39 @@ for (i in 1:length(V(pp2_igraph))){
   }
 }
 
+#anything not in a clique is in it's own group
+max_membership2 = max(membership_clique2)+1
+for (i in 1:length(V(pp2_igraph))){
+  if (membership_clique2[i] == 0){
+    membership_clique2[i] = max_membership2
+    max_membership2 = max_membership2 + 1
+  }
+}
+
+sort(table(membership_clique), decreasing = TRUE)[1:10]
+# membership_clique
+# 152 134 162 107  94 130 189  90 119 123 
+# 15  14  14  12  11  11  11  10  10  10 
+# intepretation: a group named "152" has maximum number of vertices (=15),
+# there are two groups (134 and 162) both having 14 vertices 
+
+sort(table(membership_clique2), decreasing = TRUE)[1:10]
+# membership_clique
+# 152 134 162 107  94 130 189  90 119 123 
+# 15  14  14  12  11  11  11  10  10  10 
+# intepretation: a group named "152" has maximum number of vertices (=15),
+# there are two groups (134 and 162) both having 14 vertices
+
 #contract the cliques
 g2 <- contract(graph = pp2_igraph, membership_clique, vertex.attr.comb=toString)
-length(V(g))
-length(V(g2))
+vcount(pp2_igraph); ecount(pp2_igraph)
+vcount(g2); ecount(g2)
 
+pp2_igraph_contracted <- contract(graph = pp2_igraph, membership_clique2, vertex.attr.comb=toString)
+vcount(pp2_igraph); ecount(pp2_igraph)
+vcount(pp2_igraph_contracted); ecount(pp2_igraph_contracted)
+
+# look more into: http://blog.revolutionanalytics.com/2015/08/contracting-and-simplifying-a-network-graph.html
 
 
 
