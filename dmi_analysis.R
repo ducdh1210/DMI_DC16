@@ -90,7 +90,7 @@ library(igraph)
 # via directly optimizing a modularity score.
 ppi2_fastgreedy = fastgreedy.community(pp2_igraph, weights = E(pp2_igraph)$weight)
 attributes(ppi2_fastgreedy)
-modularity(ppi2_fastgreedy) # [1] 0.4127827
+
 communities(ppi2_fastgreedy)
 
 ppi2_fastgreedy_den = as.dendrogram(ppi2_fastgreedy)
@@ -121,37 +121,15 @@ table(membership(ppi2_fastgreedy)) # 125 modules
 module_matrix_fastgreedy = getModuleMatrix(igraph_object = pp2_igraph, 
                                    community_membership = membership(ppi2_fastgreedy))
 
+### Test out different evaluation metrics
+
+modularity(x = ppi2_fastgreedy) # [1] 0.4127827
+modularity(x = ppi2_fastgreedy, membership = ppi2_fastgreedy2$membership, weights = V(pp2_igraph)$weight) # [1] 0.4127827
+mod.matrix(graph = pp2_igraph,  membership = ppi2_fastgreedy2$membership, weights = V(pp2_igraph)$weight)
+mod.matrix(ppi2_fastgreedy)
 ppi2_fastgreedy_module_density = getModuleDensity(igraphObject = pp2_igraph, communityObject = ppi2_fastgreedy)
-
-getModuleDensity = function(igraphObject = NULL, communityObject = NULL){
-  module_density = sapply(sort(unique(membership(communityObject))), function(assigned_cluster) {
-    subg <-induced.subgraph(igraphObject, which(membership(communityObject)==assigned_cluster)) #membership id differs for each cluster
-    #ecount(subg)/ecount(g)
-    graph.density(subg)
-  })
-  return(module_density)
-}
-
-ppi2_fastgreedy_module_density = sapply(sort(unique(membership(ppi2_fastgreedy))), function(assigned_cluster) {
-  subg <-induced.subgraph(pp2_igraph, which(membership(ppi2_fastgreedy)==assigned_cluster)) #membership id differs for each cluster
-  #ecount(subg)/ecount(g)
-  graph.density(subg)
-})
-
-getModuleClusterCoef = function(igraphObject = NULL, communityObject = NULL){
-  module_clusterCoeff = sapply(sort(unique(membership(communityObject))), function(assigned_cluster) {
-    subg <-induced.subgraph(igraphObject, which(membership(communityObject)==assigned_cluster)) #membership id differs for each cluster
-    #ecount(subg)/ecount(g)
-    transitivity(subg, type = "global")
-  })
-  return(module_clusterCoeff)
-}
-
-mm_module_clusCoef = sapply(sort(unique(membership(mm_zachary))), function(assigned_cluster) {
-  subg <-induced.subgraph(g_zachary, which(membership(mm)==assigned_cluster)) #membership id differs for each cluster
-  #ecount(subg)/ecount(g)
-  transitivity(subg, type = "global")
-})
+ppi2_fastgreedy_module_clusterCoeff = getModuleClusterCoef(igraphObject = pp2_igraph, communityObject = ppi2_fastgreedy)
+ppi2_fastgreedy_simmiliarty = getModuleSimmilarity(igraphObject = pp2_igraph, communityObject = ppi2_fastgreedy, method = "jaccard")
 
 #### ---------------- WALK TRAP ----------------------------------------------------------
 library(igraph)
@@ -239,6 +217,100 @@ which.max(rev(ppi2_louvain$modularity)) # 83
 
 test = as.dendrogram(ppi2_louvain)
 
+#### ---------------- MAXIMAL CLIQUE ----------------------------------------------
+
+# find the number of edges from each vertex i 
+num_vertices = vcount(pp2_igraph) # [1] 12420
+num_edges = numeric()
+for (i in 1:num_vertices) { 
+  edges = E(pp2_igraph) [ from(V(pp2_igraph)[i]) ]
+  num_edges = append(num_edges, length(edges))
+}
+
+# only look at the vertex with more than 10 edges
+idx = which(num_edges > 10)
+length(idx)  # [1] 6132 ==> thus only 6132 out of 12420 vertices have degree more than 10
+s = V(pp2_igraph)[idx]
+class(s) # [1] "igraph.vs"
+# + 6132/12420 vertices, named:
+#   [1] G0     G1     G4     G5     G6     G10    G11    G13    G14    G15    G16    G17    G18    G19    G21   
+# [16] G22    G23    G24    G25    G26    G29    G30    G31    G32    G33    G34    G35    G36    G37    G38   
+# [31] G39    G41    G42    G43    G44    G45    G46    G47    G48    G49    G50    G51    G52    G54    G55   
+# [46] G57    G59    G60    G61 
+
+# find (max) cliques in graph
+cliq = max_cliques(pp2_igraph, min = 5, max = NULL, subset=s) # cliq is a list
+length(cliq) # [1] 58424 ==> toal number of cliq whose size is at least 5 is 58424
+
+# create a vector whose element is each clique's size in the list "cliq" 
+cliq_sizes = sapply(cliq, function(vertices) length(vertices))
+# name the vector cliq_size by the cliq index order 
+names(cliq_sizes) = 1:length(cliq_sizes)
+# reorder the names based on the decreasing order of the size
+order_by_size = as.numeric(names(sort(cliq_sizes,decreasing = TRUE)))
+# if it works, the first element in the new name should indicate the largest clique
+cliq_sizes[order_by_size[1]] # return 73 --> checked!
+# reorder the clique by new order
+cliq_ordered_by_size = cliq[order_by_size]
+
+plot(sapply(cliq_ordered_by_size, function(vertices) length(vertices)))
+
+cliq_names = lapply(cliq, function(vertices) names(vertices))
+cliq_names_ul = unlist(cliq_names)
+length(cliq_sizes) # [1] 58424 ==> just to check!
+save(cliq, file="cliques2_sub.RData")
+
+table(cliq_sizes)
+
+# cliq_sizes
+# 5    6    7    8    9   10   11   12   13   14   15   16   17   18   19   20   21   22   23   24   25   26   27 
+# 5154 4098 3294 2417 1803 1584 1579 1623 1514 1520 1327 1356 1343 1328 1262 1206 1439 1568 1359 1509 1734 1648 1499 
+# 28   29   30   31   32   33   34   35   36   37   38   39   40   41   42   43   44   45   46   47   48   49   50 
+# 1220 1243 1105 1103  942  937  877  847  867  797  681  564  578  368  306  340  220  239  180  147  164  160  145 
+# 51   52   53   54   55   56   57   58   59   60   61   62   64   65   66   67   69   70   73 
+# 123  171  136  124  139  125  110   80   64   82   49    1    7    5    2    6    1    4    1 
+
+summary(cliq_sizes)
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 5.0     8.0    18.0    19.8    28.0    73.0 
+
+
+
+# create membership_clique which says which clique
+# each vertex belongs to
+membership_clique = numeric(length = length(V(pp2_igraph)))
+names(membership_clique) = V(pp2_igraph)$name
+
+# clique labels will be c
+c = 1
+for (i in 1:10000) {
+  # a clique
+  cCliq = cliq[[i]]
+  # vertex in clique
+  idx = V(pp2_igraph)$name[cCliq]
+  # if none of the members of this clique are already in a clique
+  if (sum(membership_clique[idx]) == 0 ) {
+    # the members of this clique are in group c
+    membership_clique[idx] = c
+    c = c + 1
+  }
+}
+
+#anything not in a clique is in it's own group
+max_membership = max(membership_clique)+1
+for (i in 1:length(V(pp2_igraph))){
+  if (membership_clique[i] == 0){
+    membership_clique[i] = max_membership
+    max_membership = max_membership + 1
+  }
+}
+
+#contract the cliques
+g2 <- contract(graph = pp2_igraph, membership_clique, vertex.attr.comb=toString)
+length(V(g))
+length(V(g2))
+
+
 
 
 #### ---------------- UTILITY FUNCTIONS -------------------------------------------
@@ -261,4 +333,28 @@ getModuleMatrix = function(igraph_object, community_membership){
   return(module_matrix)
 }
 
+getModuleDensity = function(igraphObject = NULL, communityObject = NULL){
+  module_density = sapply(sort(unique(membership(communityObject))), function(assigned_cluster) {
+    subg <-induced.subgraph(igraphObject, which(membership(communityObject)==assigned_cluster)) #membership id differs for each cluster
+    #ecount(subg)/ecount(g)
+    graph.density(subg)
+  })
+  return(module_density)
+}
+
+getModuleClusterCoef = function(igraphObject = NULL, communityObject = NULL){
+  module_clusterCoef = sapply(sort(unique(membership(communityObject))), function(assigned_cluster) {
+    subg <-induced.subgraph(igraphObject, which(membership(communityObject)==assigned_cluster)) #membership id differs for each cluster
+    transitivity(subg, type = "global")
+  })
+  return(module_clusterCoef)
+}
+
+getModuleSimmilarity= function(igraphObject = NULL, communityObject = NULL, method = "jaccard"){
+  module_similarity = sapply(sort(unique(membership(communityObject))), function(assigned_cluster) {
+    subg <-induced.subgraph(igraphObject, which(membership(communityObject)==assigned_cluster)) #membership id differs for each cluster
+    similarity(subg, method = method)
+  })
+  return(module_similarity)
+}
 
