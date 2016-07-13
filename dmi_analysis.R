@@ -15,23 +15,24 @@ setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
 rm(list = ls()); load("PPI2.RData")
 
 # #### ---------------- import file -------------------------------------------------
-# setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
-# rm(list = ls())
-# download_path = "/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge"
-# downloaded_folder <- "DREAM11_subchallenge1_initial_networks"
-# file_names = paste(download_path,"/",downloaded_folder,"/",list.files(downloaded_folder)
-#                   ,sep = "")
-# ppi_2 = read.table(file = file_names[2], header = TRUE, sep = "\t")
+setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
+rm(list = ls())
+download_path = "/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge"
+downloaded_folder <- "DREAM11_subchallenge1_initial_networks"
+file_names = paste(download_path,"/",downloaded_folder,"/",list.files(downloaded_folder)
+                  ,sep = "")
+ppi_2 = read.table(file = file_names[2], header = TRUE, sep = "\t")
 # 
 # #### ---------------- PPI_2 -------------------------------------------------
-# # to free up memory, remove all variables that are not ppi_2
-# rm(list = ls()[-which(ls() == "ppi_2" )])
-# temp_pp2 = ppi_2
-# colnames(temp_pp2) = c("V1","V2","weight"); head(temp_pp2)
-# temp_pp2$V1 = paste("G",temp_pp2$V1,sep = "")
-# temp_pp2$V2 = paste("G",temp_pp2$V2,sep = "")
-# pp2_igraph = graph.data.frame(d = temp_pp2, directed = F);
-# rm(temp_pp2)
+# to free up memory, remove all variables that are not ppi_2
+rm(list = ls()[-which(ls() == "ppi_2" )])
+temp_pp2 = ppi_2
+colnames(temp_pp2) = c("V1","V2","weight"); head(temp_pp2)
+temp_pp2$V1 = paste("G",temp_pp2$V1,sep = "")
+temp_pp2$V2 = paste("G",temp_pp2$V2,sep = "")
+pp2_igraph = graph.data.frame(d = temp_pp2, directed = F);
+#pp2_igraph = graph.data.frame(d = temp_pp2, directed = T);
+rm(temp_pp2)
 
   
 # temp_pp2[] = lapply(temp_pp2, as.character)
@@ -89,9 +90,9 @@ library(igraph)
 # This function tries to find dense subgraph, also called communities in graphs 
 # via directly optimizing a modularity score.
 ppi2_fastgreedy = fastgreedy.community(pp2_igraph, weights = E(pp2_igraph)$weight)
-attributes(ppi2_fastgreedy)
+table(membership(ppi2_fastgreedy)) # 125 modules
 
-communities(ppi2_fastgreedy)
+attributes(ppi2_fastgreedy); communities(ppi2_fastgreedy)
 
 ppi2_fastgreedy_den = as.dendrogram(ppi2_fastgreedy)
 
@@ -116,7 +117,6 @@ plot_dendrogram(ppi2_fastgreedy_den)
 
 plot(rev(ppi2_fastgreedy$modularity), xlab = 'Number of clusters', ylab = 'Modularity value')
 which.max(rev(ppi2_fastgreedy$modularity)) # 83
-table(membership(ppi2_fastgreedy)) # 125 modules
 
 module_matrix_fastgreedy = getModuleMatrix(igraph_object = pp2_igraph, 
                                    community_membership = membership(ppi2_fastgreedy))
@@ -219,17 +219,16 @@ test = as.dendrogram(ppi2_louvain)
 
 #### ---------------- MAXIMAL CLIQUE ----------------------------------------------
 
-# find the number of edges from each vertex i 
-num_vertices = vcount(pp2_igraph) # [1] 12420
-num_edges = numeric()
-for (i in 1:num_vertices) { 
+# find the number of edges from each vertex i ==> TAKE REALLY LONG TIME TO RUN!
+for (i in 1:vcount(pp2_igraph)) { 
   edges = E(pp2_igraph) [ from(V(pp2_igraph)[i]) ]
   num_edges = append(num_edges, length(edges))
-}
+}; proc.tim() - ptm
+
 
 # only look at the vertex with more than 10 edges
 idx = which(num_edges > 10)
-length(idx)  # [1] 6132 ==> thus only 6132 out of 12420 vertices have degree more than 10
+length(idx)  # [1] 6132 ==> thus only 6132 (out of 12420 vertices) have degree more than 10
 s = V(pp2_igraph)[idx]
 class(s) # [1] "igraph.vs"
 # + 6132/12420 vertices, named:
@@ -240,18 +239,20 @@ class(s) # [1] "igraph.vs"
 
 # find (max) cliques in graph
 cliq = max_cliques(pp2_igraph, min = 5, max = NULL, subset=s) # cliq is a list
-length(cliq) # [1] 58424 ==> toal number of cliq whose size is at least 5 is 58424
+length(cliq) # [1] 58424 ==> the total number of cliq (whose size is at least 5) is 58424
 
 # create a vector whose element is each clique's size in the list "cliq" 
 cliq_sizes = sapply(cliq, function(vertices) length(vertices))
-
-cliq_names = lapply(cliq, function(vertices) names(vertices))
-cliq_names_ul = unlist(cliq_names)
 length(cliq_sizes) # [1] 58424 ==> just to check!
-save(cliq, file="cliques2_sub.RData")
+
+# Note: a vertice can belong to one or multiple cliques, that's why
+# sum(cliq_sizes) = 1156938 >> original 12420 vertices
+
+# cliq_names = lapply(cliq, function(vertices) names(vertices))
+# cliq_names_ul = unlist(cliq_names)
+# save(cliq, file="cliques2_sub.RData")
 
 table(cliq_sizes)
-
 # cliq_sizes
 # 5    6    7    8    9   10   11   12   13   14   15   16   17   18   19   20   21   22   23   24   25   26   27 
 # 5154 4098 3294 2417 1803 1584 1579 1623 1514 1520 1327 1356 1343 1328 1262 1206 1439 1568 1359 1509 1734 1648 1499 
@@ -260,28 +261,36 @@ table(cliq_sizes)
 # 51   52   53   54   55   56   57   58   59   60   61   62   64   65   66   67   69   70   73 
 # 123  171  136  124  139  125  110   80   64   82   49    1    7    5    2    6    1    4    1 
 
+# So, the biggest clique (and only one of it) has size of 73, and there are 4 cliques whose size is 70
+
 summary(cliq_sizes)
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 5.0     8.0    18.0    19.8    28.0    73.0 
 
 # name the vector cliq_size by the cliq index order 
 names(cliq_sizes) = 1:length(cliq_sizes)
+# head(cliq_sizes)
+# 1 2 3 4 5 6 
+# 5 5 5 5 5 5 
+# tail(cliq_sizes)
+# 58419 58420 58421 58422 58423 58424 
+# 28    12    15    15     9     5 
+
 # reorder the names based on the decreasing order of the size
-order_by_size = as.numeric(names(sort(cliq_sizes,decreasing = TRUE)))
-# if it works, the first element in the new name should indicate the largest clique
-cliq_sizes[order_by_size[1]] # return 73 --> checked!
+indices_ordered_by_size = as.numeric(names(sort(cliq_sizes,decreasing = TRUE)))
+# if it works, the first element in the new name should indicate the size of the largest clique, which is 73
+cliq_sizes[indices_ordered_by_size[1]] # return 73 --> checked!
+
 # reorder the clique by new order
 cliq_ordered_by_size = cliq[order_by_size]
 # plot to check
-plot(sapply(cliq_ordered_by_size, function(vertices) length(vertices)))
+plot(sapply(cliq_ordered_by_size, function(vertices) length(vertices))) #correct
 
-
+###### ----------- Britanny Code ---------------------------------
 # create membership_clique which says which clique
 # each vertex belongs to
 membership_clique = numeric(length = length(V(pp2_igraph)))
 names(membership_clique) = V(pp2_igraph)$name
-membership_clique2 = numeric(length = length(V(pp2_igraph)))
-names(membership_clique2) = V(pp2_igraph)$name
 # clique labels will be c
 c = 1
 for (i in 1:10000) {
@@ -296,7 +305,30 @@ for (i in 1:10000) {
     c = c + 1
   }
 }
+#anything not in a clique is in it's own group
+max_membership = max(membership_clique)+1
+for (i in 1:length(V(pp2_igraph))){
+  if (membership_clique[i] == 0){
+    membership_clique[i] = max_membership
+    max_membership = max_membership + 1
+  }
+}
+sort(table(membership_clique), decreasing = TRUE)[1:10]
+# membership_clique
+# 152 134 162 107  94 130 189  90 119 123 
+# 15  14  14  12  11  11  11  10  10  10 
+# intepretation: a group named "152" has maximum number of vertices (=15),
+# there are two groups (134 and 162) both having 14 vertices 
 
+#contract the cliques
+g2 <- contract(graph = pp2_igraph, membership_clique, vertex.attr.comb=toString)
+vcount(pp2_igraph); ecount(pp2_igraph)
+vcount(g2); ecount(g2)
+
+
+###### ----------- My Code ---------------------------------
+membership_clique2 = numeric(length = length(V(pp2_igraph)))
+names(membership_clique2) = V(pp2_igraph)$name
 c= 1
 for (i in 1:length(cliq)) {
   # a clique
@@ -311,16 +343,6 @@ for (i in 1:length(cliq)) {
   }
 }
 
-
-#anything not in a clique is in it's own group
-max_membership = max(membership_clique)+1
-for (i in 1:length(V(pp2_igraph))){
-  if (membership_clique[i] == 0){
-    membership_clique[i] = max_membership
-    max_membership = max_membership + 1
-  }
-}
-
 #anything not in a clique is in it's own group
 max_membership2 = max(membership_clique2)+1
 for (i in 1:length(V(pp2_igraph))){
@@ -330,30 +352,24 @@ for (i in 1:length(V(pp2_igraph))){
   }
 }
 
-sort(table(membership_clique), decreasing = TRUE)[1:10]
-# membership_clique
-# 152 134 162 107  94 130 189  90 119 123 
-# 15  14  14  12  11  11  11  10  10  10 
-# intepretation: a group named "152" has maximum number of vertices (=15),
-# there are two groups (134 and 162) both having 14 vertices 
-
-sort(table(membership_clique2), decreasing = TRUE)[1:10]
-# membership_clique
-# 152 134 162 107  94 130 189  90 119 123 
-# 15  14  14  12  11  11  11  10  10  10 
-# intepretation: a group named "152" has maximum number of vertices (=15),
-# there are two groups (134 and 162) both having 14 vertices
-
-#contract the cliques
-g2 <- contract(graph = pp2_igraph, membership_clique, vertex.attr.comb=toString)
-vcount(pp2_igraph); ecount(pp2_igraph)
-vcount(g2); ecount(g2)
-
 pp2_igraph_contracted <- contract(graph = pp2_igraph, membership_clique2, vertex.attr.comb=toString)
+
+# original igraph object
 vcount(pp2_igraph); ecount(pp2_igraph)
+# [1] 12420
+# [1] 397308
+
+# cliquedified igraph object
 vcount(pp2_igraph_contracted); ecount(pp2_igraph_contracted)
+# [1] 10910
+# [1] 397308
 
 # look more into: http://blog.revolutionanalytics.com/2015/08/contracting-and-simplifying-a-network-graph.html
+pp2_igraph_contracted_simplified = simplify(pp2_igraph_contracted); 
+vcount(pp2_igraph_contracted_simplified); ecount(pp2_igraph_contracted_simplified)
+# [1] 10910
+# [1] 194841
+is_simple(pp2_igraph_contracted_simplified) # TRUE
 
 
 

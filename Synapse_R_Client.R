@@ -43,3 +43,14 @@ signal_directed_aligned = read.table(file = file_names2[3], header = TRUE, sep =
 coexpr_aligned = read.table(file = file_names2[4], header = TRUE, sep = "\t")
 cancer_aligned = read.table(file = file_names2[5], header = TRUE, sep = "\t")
 homology_aligned = read.table(file = file_names2[6], header = TRUE, sep = "\t")
+
+## ---- Prep data for WG_Cluster -----------------------------
+input.db = read.table(file = file_names[2], header = TRUE, sep = "\t")
+colnames(input.db) = c("NodeA", "NodeB", "Weight")
+input.db$NodeA = paste("P",input.db$NodeA,sep = "")
+input.db$NodeB = paste("P",input.db$NodeB,sep = "")
+
+node_names = unique(c(input.db$NodeA,input.db$NodeB))[1:10]
+node.prob.db = data.frame(Node = node_names, 
+                          Probability = 0.5, 
+                          Standard.error = 0)
