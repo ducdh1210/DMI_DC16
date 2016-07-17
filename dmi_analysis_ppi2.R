@@ -13,6 +13,7 @@ rm(list = ls());
 #load("PPI2.RData")
 load("ppi2_igraph.rda")
 load("ppi2_communities.rda")
+load("cliq.Rdata")
 
 #save(ppi2_fastgreedy, ppi2_walktrap, ppi2_labelPropagation, ppi2_infomap, ppi2_louvain, ppi2_multilevel, file = "ppi2_communities.rda")
 # #### ---------------- import file -------------------------------------------------
@@ -222,10 +223,6 @@ test = as.dendrogram(ppi2_louvain)
 #### ---------------- MAXIMAL CLIQUE ----------------------------------------------
 
 # find the number of edges from each vertex i ==> TAKE REALLY LONG TIME TO RUN!
-for (i in 1:vcount(pp2_igraph)) { 
-  edges = E(pp2_igraph) [ from(V(pp2_igraph)[i]) ]
-  num_edges = append(num_edges, length(edges))
-}; proc.tim() - ptm
 
 
 # only look at the vertex with more than 10 edges
@@ -288,16 +285,15 @@ cliq_ordered_by_size = cliq[order_by_size]
 # plot to check
 plot(sapply(cliq_ordered_by_size, function(vertices) length(vertices))) #correct
 
-###### ----------- Britanny Code ---------------------------------
-# create membership_clique which says which clique
-# each vertex belongs to
+
 membership_clique = numeric(length = length(V(pp2_igraph)))
 names(membership_clique) = V(pp2_igraph)$name
-# clique labels will be c
-c = 1
-for (i in 1:10000) {
+
+c= 1
+
+for (i in 1:length(cliq)) {
   # a clique
-  cCliq = cliq[[i]]
+  cCliq = cliq_ordered_by_size[[i]]
   # vertex in clique
   idx = V(pp2_igraph)$name[cCliq]
   # if none of the members of this clique are already in a clique
@@ -307,6 +303,7 @@ for (i in 1:10000) {
     c = c + 1
   }
 }
+
 #anything not in a clique is in it's own group
 max_membership = max(membership_clique)+1
 for (i in 1:length(V(pp2_igraph))){
@@ -315,45 +312,8 @@ for (i in 1:length(V(pp2_igraph))){
     max_membership = max_membership + 1
   }
 }
-sort(table(membership_clique), decreasing = TRUE)[1:10]
-# membership_clique
-# 152 134 162 107  94 130 189  90 119 123 
-# 15  14  14  12  11  11  11  10  10  10 
-# intepretation: a group named "152" has maximum number of vertices (=15),
-# there are two groups (134 and 162) both having 14 vertices 
 
-#contract the cliques
-g2 <- contract(graph = pp2_igraph, membership_clique, vertex.attr.comb=toString)
-vcount(pp2_igraph); ecount(pp2_igraph)
-vcount(g2); ecount(g2)
-
-###### ----------- My Code ---------------------------------
-membership_clique2 = numeric(length = length(V(pp2_igraph)))
-names(membership_clique2) = V(pp2_igraph)$name
-c= 1
-for (i in 1:length(cliq)) {
-  # a clique
-  cCliq = cliq_ordered_by_size[[i]]
-  # vertex in clique
-  idx = V(pp2_igraph)$name[cCliq]
-  # if none of the members of this clique are already in a clique
-  if (sum(membership_clique2[idx]) == 0 ) {
-    # the members of this clique are in group c
-    membership_clique2[idx] = c
-    c = c + 1
-  }
-}
-
-#anything not in a clique is in it's own group
-max_membership2 = max(membership_clique2)+1
-for (i in 1:length(V(pp2_igraph))){
-  if (membership_clique2[i] == 0){
-    membership_clique2[i] = max_membership2
-    max_membership2 = max_membership2 + 1
-  }
-}
-
-pp2_igraph_contracted <- contract(graph = pp2_igraph, membership_clique2, vertex.attr.comb=toString)
+pp2_igraph_contracted <- contract(graph = pp2_igraph, membership_clique, vertex.attr.comb=toString)
 
 # original igraph object
 vcount(pp2_igraph); ecount(pp2_igraph)
