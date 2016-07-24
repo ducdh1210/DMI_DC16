@@ -7,8 +7,6 @@ source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/graph_utility_functio
 load("ppi2_igraph.rda")
 load("ppi2_communities.rda")
 load("ppi2_clique.rda")
-load("num_edges_ppi2.rda")
-load("ppi2_lonely_objects.rda")
 
 #### ---------------- BASIC INSPECTION -------------------------------------------------
 
@@ -61,18 +59,17 @@ which(ppi2_infomap_community_clusterCoeff == 1)
 ppi2_infomap_community_clusterCoeff[which(ppi2_infomap_community_clusterCoeff == 1)]
 # [1] 1 1 1 1 1 1 1 1 1 1 1 --> thus all of those modules only has 1 nodes --> bad cases
 
-ppi2_infomap_subgraphs = getAllSubgraphs(igraphObject = pp2_igraph, 
-                                         communityObject = ppi2_infomap)
-ppi2_stat_infomap_subgraph = getSubgraphStat(ppi2_infomap_subgraphs)
-ppi2_stat_infomap_subgraph = getSubgraphStatNoNA(ppi2_stat_infomap_subgraph)
-View(ppi2_infomap_subgraph_stat)
-
 #### ---------------- MAKE USE OF UTILITY CODES ON CLIQUE -------------------------------------------------
+
+# ppi2_infomap_subgraphs = getAllSubgraphs(igraphObject = pp2_igraph, 
+#                                          communityObject = ppi2_infomap)
+# ppi2_stat_infomap_subgraph = getSubgraphStat(ppi2_infomap_subgraphs)
+# ppi2_stat_infomap_subgraph = getSubgraphStatNoNA(ppi2_stat_infomap_subgraph)
+# View(ppi2_infomap_subgraph_stat)
+
 # work with cliq
 str(cliq) # list of 58424
-
-ppi2_cliq_membership = getCliqMemebership(igraphObject = pp2_igraph, cliq = ppi2_cliq_unordered, isCliqOrdered = FALSE)
-
+ppi2_cliq_membership = getCliqMemebership(igraphObject = pp2_igraph, cliq = ppi2_cliq_unordered)
 length(unique(ppi2_cliq_membership)) # [1] 10910 --> thus there are 10910 cliq
 
 # Very important: names of the cliq also imply the relative size order of the clique
@@ -104,37 +101,16 @@ length(which(table(ppi2_cliq_membership) == 1)) # [1] 10738
 ppi2_cliqBiggerThanOne = unname(which(table(ppi2_cliq_membership) >1))
 
 ppi2_cliq_ordered = reorderCliqBySize(igraphObject = pp2_igraph, cliq = ppi2_cliq_unordered)
-
-ppi2_cliq_infomap_subgraphs = getAllSubgraphs(igraphObject = pp2_igraph, 
+ppi2_cliq_subgraphs = getAllSubgraphs(igraphObject = pp2_igraph, 
                                         clique = ppi2_cliq_ordered[ppi2_cliqBiggerThanOne])
 
-ppi2_cliqSizeOne = unname(which(table(ppi2_cliq_membership) == 1))
+ppi2_stat_cliq_subgraphs = getSubgraphStat(ppi2_cliq_subgraphs)
 
-# if the clique is size 1, meaning it has only 1 element -> create
-# a vector containing all of those elements from all the size-1 cliqueS
-ppi2_lonely_vertices = names(ppi2_cliq_membership[ppi2_cliqSizeOne])
-length(ppi2_lonely_vertices) # 10738 --> checked!
+ppi2_cliq_infomap_subgraphs[[1]]
 
-# create an igraph object form those lonely vertices
-ppi2_lonely_combined_graph <-induced.subgraph(graph = pp2_igraph, 
-                                              vids = ppi2_lonely_vertices)
-
-ppi2_lonely_infomap = infomap.community(graph = ppi2_lonely_combined_graph, 
-                                        e.weights = E(ppi2_lonely_combined_graph)$weight)
-
-ppi2_lonely_infomap_subgraphs = getAllSubgraphs(igraphObject = pp2_igraph, 
-                                                communityObject = ppi2_lonely_infomap)
-
-ppi2_lonely_infomap_stat = getSubgraphStat(list_of_subgraphs = ppi2_lonely_infomap_subgraphs)
-
-save(ppi2_lonely_vertices, ppi2_lonely_combined_graph, ppi2_lonely_infomap,
-     ppi2_lonely_infomap_subgraphs, ppi2_lonely_infomap_stat,
-     file = "ppi2_lonely_objects.rda")
-
-
-
-
-
+ppi2_cliq_size1 = unname(which(table(ppi2_cliq_membership)  == 1))
+ppi2_cliq_subgraphs_size1 = induced.subgraph(graph = pp2_igraph,
+                                             vids = ppi2_cliq_size1)
 
 
 

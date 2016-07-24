@@ -101,7 +101,6 @@ raw_counts = raw_counts[which(!low_count_mask),]
 
 # There are a number of methods for working around this, in effect, making RNA-Seq data "look" more like microarray data, but the simplest thing is just to log the data. This will transform our discrete, over-dispersed counts to a more Poisson-like continuous distribution.
 
-
 log_counts <- log2(raw_counts + 1)
 
 x = melt(as.matrix(log_counts))
@@ -167,6 +166,7 @@ for (conds in comparisons) {
 
 # Filter out genes which were not differentially expressed for any contrast
 log_counts <- log_counts[rownames(log_counts) %in% sig_genes,]
+dim(log_counts)
 
 ### Co-expression network construction
 
