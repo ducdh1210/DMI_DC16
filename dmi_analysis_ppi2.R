@@ -8,12 +8,14 @@ library('gplots'); library('ggplot2'); library('WGCNA'); library('igraph')
 library('clue'); library('ProNet')
 #### ---------------- load saved image --------------------------------------------
 setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
-rm(list = ls()); 
+source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/graph_utility_functions.R")
+rm(list = ls());  gc();
 
 #load("PPI2.RData")
 load("ppi2_igraph.rda")
 load("ppi2_communities.rda")
-load("cliq.Rdata")
+load("ppi2_clique_objects.rda")
+
 
 #save(ppi2_fastgreedy, ppi2_walktrap, ppi2_labelPropagation, ppi2_infomap, ppi2_louvain, ppi2_multilevel, file = "ppi2_communities.rda")
 # #### ---------------- import file -------------------------------------------------
@@ -22,10 +24,10 @@ rm(list = ls())
 download_path = "/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge"
 downloaded_folder <- "DREAM11_subchallenge1_initial_networks"
 file_names = paste(download_path,"/",downloaded_folder,"/",list.files(downloaded_folder)
-                  ,sep = "")
+                   ,sep = "")
 ppi_2 = read.table(file = file_names[2], header = TRUE, sep = "\t")
 
-# 
+
 # #### ---------------- PPI_2 -------------------------------------------------
 # to free up memory, remove all variables that are not ppi_2
 rm(list = ls()[-which(ls() == "ppi_2" )])
@@ -37,12 +39,7 @@ pp2_igraph = graph.data.frame(d = temp_pp2, directed = F);
 #pp2_igraph = graph.data.frame(d = temp_pp2, directed = T);
 rm(temp_pp2)
 
-  
-# temp_pp2[] = lapply(temp_pp2, as.character)
-# length(base::unique(df_ppi2$X0)) # [1] 9650
-# length(base::unique(df_ppi2$X1)) # [1] 12093   
-# length(intersect(base::unique(df_ppi2$X0), base::unique(df_ppi2$X1))) # 9323
-# length(union(base::unique(df_ppi2$X0), base::unique(df_ppi2$X1))) # 12420
+#### ---------------- WCGNA -------------------------------------------
 
 pp2_edgeList = get.edgelist(pp2_igraph)
 
@@ -53,25 +50,23 @@ pp2_adjMatrix@Dim # [1] 12420 12420
 # convert dgCMatrix to normal matrix object
 pp2_adjM = as.matrix(pp2_adjMatrix)
 
-# What is maximum clique size
-clique.number(pp2_igraph) # too slow to run, have to stop before completion
-
-#### ---------------- WCGNA -------------------------------------------
 
 # Cluster gene expression profiles; the flashClust function from
 # the authors of WGCNA is another options for larger datasets.
 # For input, we use the reciprocal of the adjacency matrix; hierarchical
 # clustering works by comparing the _distance_ between objects instead of the
 # _similarity_.
-gene_tree = hclust(as.dist(1 - pp2_adjM), method="average")
+ppi2_gene_tree = hclust(as.dist(1 - pp2_adjM), method="average")
+
+
 gc()
 # we will use the cuttreeDynamicTree method to break apart the hc dendrogram
 # into separate modules
-module_labels = cutreeDynamicTree(dendro=gene_tree, minModuleSize=15,
-                                   deepSplit=TRUE)
+ppi2_wgcna_modules = cutreeDynamicTree(dendro=ppi2_gene_tree, minModuleSize=3,
+                                       deepSplit=TRUE)
 gc()
 # assign a color to each module for easier visualization and referencing
-module_colors = labels2colors(module_labels);
+module_colors = labels2colors(ppi2_wgcna_modules);
 
 nlevels(as.factor(module_colors)) # [1] 339 ==> thus 338 modules 
 
@@ -83,8 +78,7 @@ write.graph(graph = pp2_igraph, file = file_name, format='graphml') # able to di
 #### ---------------- MCODE ---------------------------------------------------------------
 library(ProNet)
 
-result = mcode(pp2_igraph,vwp=0.05,haircut=TRUE,fluff=FALSE,fdt=0.8,loops=FALSE)
-mcode_result = result; 
+mcode_result = mcode(pp2_igraph,vwp=0.05,haircut=TRUE,fluff=FALSE,fdt=0.8,loops=FALSE)
 rm(result)
 
 #### ---------------- FAST GREEDY ---------------------------------------------------------
@@ -122,7 +116,7 @@ plot(rev(ppi2_fastgreedy$modularity), xlab = 'Number of clusters', ylab = 'Modul
 which.max(rev(ppi2_fastgreedy$modularity)) # 83
 
 module_matrix_fastgreedy = getModuleMatrix(igraph_object = pp2_igraph, 
-                                   community_membership = membership(ppi2_fastgreedy))
+                                           community_membership = membership(ppi2_fastgreedy))
 
 ### Test out different evaluation metrics
 
@@ -153,7 +147,7 @@ library(igraph)
 # https://arxiv.org/abs/physics/0605087
 ppi2_leadingEigenvector = leading.eigenvector.community(pp2_igraph, weights = E(pp2_igraph)$weight)
 module_matrix_leadingEigenvector = getModuleMatrix(igraph_object = pp2_igraph, 
-                                           community_membership = membership(ppi2_leadingEigenvector))
+                                                   community_membership = membership(ppi2_leadingEigenvector))
 
 #### ---------------- LABEL PROPODAGATION -------------------------------------------
 library(igraph)
@@ -220,98 +214,8 @@ which.max(rev(ppi2_louvain$modularity)) # 83
 
 test = as.dendrogram(ppi2_louvain)
 
-#### ---------------- MAXIMAL CLIQUE ----------------------------------------------
+#### ---------------- MAXIMAL CLIQUE -------------------------------------------
 
-# find the number of edges from each vertex i ==> TAKE REALLY LONG TIME TO RUN!
-
-
-# only look at the vertex with more than 10 edges
-idx = which(num_edges > 10)
-length(idx)  # [1] 6132 ==> thus only 6132 (out of 12420 vertices) have degree more than 10
-s = V(pp2_igraph)[idx]
-class(s) # [1] "igraph.vs"
-# + 6132/12420 vertices, named:
-#   [1] G0     G1     G4     G5     G6     G10    G11    G13    G14    G15    G16    G17    G18    G19    G21   
-# [16] G22    G23    G24    G25    G26    G29    G30    G31    G32    G33    G34    G35    G36    G37    G38   
-# [31] G39    G41    G42    G43    G44    G45    G46    G47    G48    G49    G50    G51    G52    G54    G55   
-# [46] G57    G59    G60    G61 
-
-# find (max) cliques in graph
-cliq = max_cliques(pp2_igraph, min = 5, max = NULL, subset=s) # cliq is a list
-length(cliq) # [1] 58424 ==> the total number of cliq (whose size is at least 5) is 58424
-
-# create a vector whose element is each clique's size in the list "cliq" 
-cliq_sizes = sapply(cliq, function(vertices) length(vertices))
-length(cliq_sizes) # [1] 58424 ==> just to check!
-
-# Note: a vertice can belong to one or multiple cliques, that's why
-# sum(cliq_sizes) = 1156938 >> original 12420 vertices
-
-# cliq_names = lapply(cliq, function(vertices) names(vertices))
-# cliq_names_ul = unlist(cliq_names)
-# save(cliq, file="cliques2_sub.RData")
-
-table(cliq_sizes)
-# cliq_sizes
-# 5    6    7    8    9   10   11   12   13   14   15   16   17   18   19   20   21   22   23   24   25   26   27 
-# 5154 4098 3294 2417 1803 1584 1579 1623 1514 1520 1327 1356 1343 1328 1262 1206 1439 1568 1359 1509 1734 1648 1499 
-# 28   29   30   31   32   33   34   35   36   37   38   39   40   41   42   43   44   45   46   47   48   49   50 
-# 1220 1243 1105 1103  942  937  877  847  867  797  681  564  578  368  306  340  220  239  180  147  164  160  145 
-# 51   52   53   54   55   56   57   58   59   60   61   62   64   65   66   67   69   70   73 
-# 123  171  136  124  139  125  110   80   64   82   49    1    7    5    2    6    1    4    1 
-
-# So, the biggest clique (and only one of it) has size of 73, and there are 4 cliques whose size is 70
-
-summary(cliq_sizes)
-# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-# 5.0     8.0    18.0    19.8    28.0    73.0 
-
-# name the vector cliq_size by the cliq index order 
-names(cliq_sizes) = 1:length(cliq_sizes)
-# head(cliq_sizes)
-# 1 2 3 4 5 6 
-# 5 5 5 5 5 5 
-# tail(cliq_sizes)
-# 58419 58420 58421 58422 58423 58424 
-# 28    12    15    15     9     5 
-
-# reorder the names based on the decreasing order of the size
-indices_ordered_by_size = as.numeric(names(sort(cliq_sizes,decreasing = TRUE)))
-# if it works, the first element in the new name should indicate the size of the largest clique, which is 73
-cliq_sizes[indices_ordered_by_size[1]] # return 73 --> checked!
-
-# reorder the clique by new order
-cliq_ordered_by_size = cliq[order_by_size]
-# plot to check
-plot(sapply(cliq_ordered_by_size, function(vertices) length(vertices))) #correct
-
-
-membership_clique = numeric(length = length(V(pp2_igraph)))
-names(membership_clique) = V(pp2_igraph)$name
-
-c= 1
-
-for (i in 1:length(cliq)) {
-  # a clique
-  cCliq = cliq_ordered_by_size[[i]]
-  # vertex in clique
-  idx = V(pp2_igraph)$name[cCliq]
-  # if none of the members of this clique are already in a clique
-  if (sum(membership_clique[idx]) == 0 ) {
-    # the members of this clique are in group c
-    membership_clique[idx] = c
-    c = c + 1
-  }
-}
-
-#anything not in a clique is in it's own group
-max_membership = max(membership_clique)+1
-for (i in 1:length(V(pp2_igraph))){
-  if (membership_clique[i] == 0){
-    membership_clique[i] = max_membership
-    max_membership = max_membership + 1
-  }
-}
 
 pp2_igraph_contracted <- contract(graph = pp2_igraph, membership_clique, vertex.attr.comb=toString)
 
@@ -331,6 +235,129 @@ vcount(pp2_igraph_contracted_simplified); ecount(pp2_igraph_contracted_simplifie
 # [1] 10910
 # [1] 194841
 is_simple(pp2_igraph_contracted_simplified) # TRUE
+
+
+#### ---------------- MAXIMAL CLIQUE (2)----------------------------------------
+
+# obtain list of igraph.vs objects
+ppi2_clique_list = getMaximalClique(igraphObject = pp2_igraph,
+                                    minCliqueSize = 5, 
+                                    degreeThreshold = 10)
+# NOTE that in this list, different cliques can share similar vertices 
+
+# obtain vector of clique membership
+ppi2_clique_membership = getCliqMemebership(igraphObject = pp2_igraph,
+                                            cliq = ppi2_clique_list,
+                                            isCliqOrdered = F)
+
+save(ppi2_clique_list, ppi2_cliq_membership, file = "ppi2_clique_objects.rda")
+load("ppi2_clique_objects.rda")
+
+length(ppi2_clique_list) # 58424
+length(ppi2_clique_list[[1]])
+clique_sizes = sapply(ppi2_clique_list, function(clique) length(clique))
+summary(clique_sizes)
+
+# Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 5.0     8.0    18.0    19.8    28.0    73.0 
+
+# some counting statistic
+max(ppi2_clique_membership) # 10910 --> number of predicted modules
+table(table(ppi2_clique_membership))
+# 1     5     6     7     8     9    10    11    12    13    14    15    16    17    19    21 
+# 10738    63    25    18    16     6     7     8     3     2     3     1     2     1     1     1 
+# 23    25    26    28    31    32    41    44    45    46    55    73 
+# 2     2     2     1     1     1     1     1     1     1     1     1 
+
+# meaning: 10738 cliques only has 1 elements --> trivial
+
+modularity(x = pp2_igraph, 
+           membership = ppi2_clique_membership, 
+           weights = E(pp2_igraph)$weight) # [1] 0.05431305
+
+ppi2_clique_subgraph_list = getAllSubgraphs(igraphObject = pp2_igraph,
+                                            clique = ppi2_clique_list, 
+                                            cliqueMembership = ppi2_clique_membership)
+
+getCommunityWeightedStat(list_of_subgraphs = ppi2_clique_subgraph_list)
+
+pp2_contracted = contract(graph = pp2_igraph, ppi2_clique_membership, vertex.attr.comb=toString)
+
+pp2_clique_simplified1 = simplify(graph = pp2_contracted, 
+                                  remove.multiple = TRUE, 
+                                  remove.loops = FALSE)
+
+pp2_clique_simplified1_louvain = cluster_louvain(pp2_igraph_simplified1, 
+                                                 weights = E(pp2_igraph_simplified1)$weight) 
+
+max(membership(pp2_clique_simplified1_louvain)) # 61
+
+table(table(membership(pp2_clique_simplified1_louvain)))
+
+modularity(x = pp2_clique_simplified1, membership = pp2_clique_simplified1_louvain)
+
+pp2_clique_simplified2 = simplify(graph = pp2_contracted, 
+                                  remove.multiple = TRUE, 
+                                  remove.loops = TRUE)
+
+pp2_clique_simplified2_louvain = cluster_louvain(pp2_clique_simplified2, 
+                                                 weights = E(pp2_clique_simplified2)$weight) 
+
+max(membership(pp2_clique_simplified2_louvain)) # 63
+table(table(membership(pp2_clique_simplified2_louvain)))
+
+
+
+##### ------- How to deal with size 1 clique -----------------------------------
+
+# Strategy 1: 
+#   1. combine 10738 nodes from those cliques into a graph 
+#   2. apply community detection algorithms on that graph
+#   3. integrate the newly found modules with the clique
+# 
+# Strategy 2:
+#   1. For each nodes belonging to one of 10738 cliques, find which other (bigger)
+#      cliques it can be moved into. Question: How to decide which cliques should 
+#      it moves into?
+
+# Strategy 3: Combine Louvain result with clique
+# General questions: How to
+# 1. Merge smaller modules
+# 2. Divide up big modules
+# 3. Order of operation for (1) and (2): sequential or simultanous?
+
+
+# get indices of clique whose size = 1
+ppi2_cliq_size_one = names(table(ppi2_clique_membership)[which(table(ppi2_clique_membership) == 1)])
+ppi2_alone_vertices = names(ppi2_clique_membership[which(ppi2_clique_membership %in% ppi2_cliq_size_one)])
+ppi2_combined_alone_vertices_graph = induced.subgraph(graph = pp2_igraph, vids = ppi2_alone_vertices)
+graph.density(ppi2_combined_alone_vertices_graph) # 0.001914204, it's lower than 
+# pp2_graph's density, which is 0.005151682
+transitivity(ppi2_combined_alone_vertices_graph, type = "global") # 0.4160488, actually higher than 
+# pp2_graph's clustering coefficient, which is 0.3625158
+
+test = infomap.community(graph = ppi2_combined_alone_vertices_graph, 
+                         e.weights = E(ppi2_combined_alone_vertices_graph)$weight)
+
+modularity(test) # 0.5332497
+modularity(x = ppi2_combined_alone_vertices_graph, membership = membership(test)) # 0.3974415
+max(membership(test))
+test2 = getAllSubgraphs(igraphObject = ppi2_combined_alone_vertices_graph,communityObject = test) 
+getCommunityWeightedStat(list_of_subgraphs = test2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

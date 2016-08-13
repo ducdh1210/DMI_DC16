@@ -12,7 +12,7 @@ load("ppi2_compare_summary.rda")
 
 ppi2_infomap_copied = ppi2_infomap
 
-##### basic built-in compare functions
+#### ---------------- BASIC COMPARE -------------------------------------------
 
 # Possible values: ‘vi’ is the variation of information (VI) metric of Meila (2003), 
 # ‘nmi’ is the normalized mutual information measure proposed by Danon et al. (2005), 
@@ -41,17 +41,49 @@ ppi2_infomap
 # [1] "G5"     "G21"    "G22"    "G35"    "G36"    "G131"   "G147"   "G209"   "G337"   "G346"   "G417"   "G437"   "G489"   "G672"  
 # [15] "G682"   "G709"   "G734"   "G735"   "G736"   "G737" .....
 
-ppi2_infomap[1]
+#### -----------PLOT NUM OF MODULES VS MODULE SIZE ------------------------------
 
-membership(ppi2_infomap)
+ppi2_module_sizes = list(cc1 = as.numeric(table(membership(ppi2_infomap))), 
+                        cc2 = as.numeric(table(membership(ppi2_louvain))), 
+                        cc3 = as.numeric(table(membership(ppi2_walktrap))), 
+                        cc4 = as.numeric(table(membership(ppi2_fastgreedy))),
+                        cc5 = as.numeric(table(membership(ppi2_labelPropagation)))
+                        ) 
+par(xpd=T, mar=par()$mar+c(0,3,0,0))
+boxplot(ppi2_module_sizes,  horizontal = TRUE, ylim = c(0,50), xaxt = 'n', yaxt = 'n')
+axis(1, at = seq(from = 0, to = 50, by = 2), labels = as.character(seq(from = 0, to = 50, by = 2)))
+y_labels = c(paste("infomap",as.character(max(membership(ppi2_infomap))), sep = "-"),
+             paste("louvain",as.character(max(membership(ppi2_louvain))), sep = "-"),
+             paste("walktrap",as.character(max(membership(ppi2_walktrap))), sep = "-"),
+             paste("fastgreedy",as.character(max(membership(ppi2_fastgreedy))), sep = "-"),
+             paste("labelprop",as.character(max(membership(ppi2_labelPropagation))), sep = "-") 
+            )
+axis(2, at = 1:length(y_labels), las = 1, labels = y_labels)
+
+par(xpd=F)
+# boxplot(as.numeric(table(membership(ppi2_infomap))), horizontal = TRUE, ylab = as.character(max(membership(ppi2_infomap))) )
+boxplot(as.numeric(table(membership(ppi2_louvain))), horizontal = TRUE, 
+        xaxt = 'n' )
+axis(1, at = seq(from = 0, to = 1000, by = 30), labels = as.character(seq(from = 0, to = 1000, by = 30)))
+axis(2, at = 1, labels = as.character(max(membership(ppi2_louvain))) )
+
+summary(getModuleVertexSize(igraphObject = pp2_igraph, communityObject = ppi2_infomap))
+summary(getModuleVertexSize(igraphObject = pp2_igraph, communityObject = ppi2_louvain))
+summary(getModuleVertexSize(igraphObject = pp2_igraph, communityObject = ppi2_walktrap))
+summary(getModuleVertexSize(igraphObject = pp2_igraph, communityObject = ppi2_fastgreedy))
+summary(getModuleVertexSize(igraphObject = pp2_igraph, communityObject = ppi2_labelPropagation))
+
+ppi2_stat_alg_matrix
 
 #### ---------------- COMPARE RESULT PPI2  -------------------------------------
 
-### NOTE that all the statistics is computed on subgraphs with minimum of 3 vertices
+ppi2_stat_alg_matrix
 
 #### infomap
 ppi2_subgraphs_infomap = getAllSubgraphs(igraphObject = pp2_igraph, communityObject = ppi2_infomap)
 ppi2_stat_infomap = getSubgraphStat(list_of_subgraphs = ppi2_subgraphs_infomap, minVertexCount = 3)
+ppi2_infomap_size = getModuleVertexSize(igraphObject = pp2_igraph, communityObject = ppi2_infomap)
+summary(getModuleVertexSize(igraphObject = pp2_igraph, communityObject = ppi2_infomap))
 
 # we can either use ppi2_stat_infomap or ppi2_subgraphs_infomap to compute the weighted module
 #ppi2_stat_module_infomap = getCommunityWeightedStat(stat_dataframe = ppi2_stat_infomap, communityObject = ppi2_infomap)

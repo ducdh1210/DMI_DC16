@@ -8,7 +8,7 @@ require(igraph)
 getAllSubgraphs = function(igraphObject = NULL, 
                            communityObject = NULL, 
                            clique = NULL, 
-                           cliqueSorted = TRUE, 
+                           cliqueSorted = FALSE, 
                            cliqueMembership = NULL,
                            minCliqueSize = 5){
   list_of_all_subgraphs  = list();
@@ -27,7 +27,7 @@ getAllSubgraphs = function(igraphObject = NULL,
       # if cliq is provided, first check if it is sorted by size; if not, then 
       #  call reorderCliqBySize to return the ordered clique list
       if (!cliqueSorted){
-        clique = reorderCliqBySize(igraphObject = igraphObject, cliq = cliq)
+        clique = reorderCliqBySize(igraphObject = igraphObject, cliq = clique)
       }
       clique = clique[unname(which(table(cliqueMembership) >= minCliqueSize))]
       for (i in 1:length(clique)){
@@ -36,11 +36,16 @@ getAllSubgraphs = function(igraphObject = NULL,
       }
     }
   }
-  # for (i in sort(unique(membership(communityObject)))){
-  #     list_of_all_subgraphs[[i]] = induced.subgraph(igraphObject,
-  #                                                   which(membership(communityObject)==i))
-  # }
+
   return(list_of_all_subgraphs)
+}
+
+# get subgraph sizes given a list of subgraphs
+# to run this on clique: step 1: call getMaximalClique, step 2: call getAllSubgraphs
+# step 3: call this function
+getSubgraphSize = function(list_of_subgraphs){
+  size = sapply(list_of_subgraphs, function(subgraph) vcount(subgraph))
+  return(size)
 }
 
 
@@ -69,7 +74,7 @@ getMaximalClique = function(igraphObject = NULL,
   idx = which(verticesDegree > degreeThreshold)
   s = V(igraphObject)[idx]
   # obtain cliques with provided parameters
-  cliq = max_cliques(pp2_igraph, 
+  cliq = max_cliques(igraphObject, 
                      min = minCliqueSize, 
                      max = maxCliqueSize, 
                      subset=s) 
@@ -133,23 +138,18 @@ getCliqMemebership = function(igraphObject = NULL,
   return(membership_clique)
 }
 
-# get subgraph sizes given a list of subgraphs
-getSubgraphSize = function(list_of_subgraphs){
-  size = sapply(list_of_subgraphs, function(subgraph) vcount(subgraph))
-  return(size)
-}
 
 # get total number of edges in a community which are not intra-community edges
 # this code takes really long time to run
 getNumFrontierEdges = function(igraph_object, list_of_subgraphs, vertices_degree){
-  names(vertices_degree) = names(V(pp2_igraph))
+  names(vertices_degree) = names(V(igraph_object))
   sapply(list_of_subgraphs)
   
   subgraph = list_of_subgraphs[[1]]
   for (i in 1:vcount(subgraph)) { 
     intra_edges = E(subgraph) [ from(V(subgraph)[i]) ]
-    idx = match(V(subgraph)[i]$name, V(pp2_igraph)$name)
-    all_edges = E(pp2_igraph) [ idx ]
+    idx = match(V(subgraph)[i]$name, V(igraph_object)$name)
+    all_edges = E(igraph_object) [ idx ]
     num_inter_edges = length(all_edges) - length(intra_edges)
   }
   
@@ -269,6 +269,14 @@ getModuleSimmilarity= function(igraphObject = NULL, communityObject = NULL, meth
   module_similarity = sapply(sort(unique(membership(communityObject))), function(assigned_cluster) {
     subg <-induced.subgraph(igraphObject, which(membership(communityObject)==assigned_cluster)) #membership id differs for each cluster
     similarity(subg, method = method)
+  })
+  return(module_similarity)
+}
+
+getModuleVertexSize= function(igraphObject = NULL, communityObject = NULL){
+  module_similarity = sapply(sort(unique(membership(communityObject))), function(assigned_cluster) {
+    subg <-induced.subgraph(igraphObject, which(membership(communityObject)==assigned_cluster)) #membership id differs for each cluster
+    vcount(subg)
   })
   return(module_similarity)
 }

@@ -1,5 +1,5 @@
 #### ---------------- LOAD SAVED OBJECTS -------------------------------------------------
-rm(list = ls())
+rm(list = ls()); gc()
 setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
 source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/graph_utility_functions.R")
 
@@ -59,7 +59,7 @@ which(ppi2_infomap_community_clusterCoeff == 1)
 ppi2_infomap_community_clusterCoeff[which(ppi2_infomap_community_clusterCoeff == 1)]
 # [1] 1 1 1 1 1 1 1 1 1 1 1 --> thus all of those modules only has 1 nodes --> bad cases
 
-#### ---------------- MAKE USE OF UTILITY CODES ON CLIQUE -------------------------------------------------
+#### ---------------- MAKE USE OF UTILITY CODES ON CLIQUE ----------------------
 
 # ppi2_infomap_subgraphs = getAllSubgraphs(igraphObject = pp2_igraph, 
 #                                          communityObject = ppi2_infomap)
