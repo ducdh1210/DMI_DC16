@@ -125,6 +125,23 @@ colnames(ppi2_stat_alg_matrix) = c("density", "clusCoef", "avg_simmiliarity", "m
 # save result
 save(ppi2_stat_alg_matrix, file = "ppi2_compare_summary.rda")
 
+#### -------------- CREATE COMPARE MATRICES ------------------------------------
+
+ppi2_stat_alg_matrix
+#                     density   clusCoef   avg_simmiliarity modularity
+# infomap           0.25319805 0.3908631       0.13978319  0.4370835
+# fastgreedy        0.02784615 0.4827973       0.01298743  0.4127827
+# walktrap          0.13368894 0.4310397       0.06726763  0.3913991
+# louvain           0.03702952 0.5355259       0.01839634  0.4961280
+# label_propagation 0.03067184 0.3716713       0.01497208  0.1716730
+
+mclust::adjustedRandIndex(ppi2_infomap$membership, ppi2_fastgreedy$membership) # [1] 0.03747002
+mclust::adjustedRandIndex(ppi2_infomap$membership, ppi2_walktrap$membership) # [1] 0.05862351
+mclust::adjustedRandIndex(ppi2_infomap$membership, ppi2_louvain$membership) # [1] 0.1197415
+mclust::adjustedRandIndex(ppi2_fastgreedy$membership, ppi2_walktrap$membership) # [1] 0.1142185
+mclust::adjustedRandIndex(ppi2_fastgreedy$membership, ppi2_louvain$membership) # [1] 0.1405325
+mclust::adjustedRandIndex(ppi2_walktrap$membership, ppi2_louvain$membership) # [1] 0.1075633
+
 #### --------------- RETRIEVE NUMBER OF FRONTIER EDGES -------------------------
 
 subgraph1 = ppi2_subgraphs_infomap[[1]]

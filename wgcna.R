@@ -2,7 +2,7 @@ setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
 require(igraph); require(WGCNA)
 allowWGCNAThreads()
 
-load("ppi2_igraph.rda")
+## -------------Dataset 1 ----------------------------------------------------------------
 load("ppi1.Rda")
 
 ppi1_edgeList = get.edgelist(ppi1_igraph)
@@ -30,7 +30,31 @@ names(ppi1_wgcna_modules) = V(ppi1_igraph)$name
 
 save(ppi1_wgcna_modules, file = "wgcna_modules.rda")
 
-## --------------------
+## -------------Dataset 2 ----------------------------------------------------------------
+
+load("ppi2_igraph.rda")
+load("ppi2_communities.rda")
+
+adjMatrix = get.adjacency(pp2_igraph, attr = "weight")
+adjM = as.matrix(adjMatrix); gc()
+gene_tree = hclust(as.dist(1 - adjM), method="average"); gc()
+wgcna_modules = cutreeDynamicTree(dendro=gene_tree, 
+                                  minModuleSize=100,
+                                  deepSplit=TRUE)
+
+names(wgcna_modules) = V(pp2_igraph)$name
+table(table(wgcna_modules))
+
+modularity(x = pp2_igraph, membership = ppi2_louvain$membership, weights = E(pp2_igraph)$weight)
+
+mclust::adjustedRandIndex(wgcna_modules, ppi2_louvain$membership) # 0.01
+mclust::adjustedRandIndex(wgcna_modules, ppi2_walktrap$membership) # 0.006277767
+mclust::adjustedRandIndex(wgcna_modules, ppi2_fastgreedy$membership) # 0.003222752
+mclust::adjustedRandIndex(wgcna_modules, ppi2_infomap$membership) # [1] 0.1066305
+
+gc()
+
+## -------------Dataset 3 ----------------------------------------------------------------
 rm(list = ls()); gc()
 load("signaling3.Rda")
 adjMatrix = get.adjacency(signaling3_igraph, attr = "weight")
@@ -39,7 +63,7 @@ gene_tree = hclust(as.dist(1 - adjM), method="average")
 wgcna_modules = cutreeDynamicTree(dendro=gene_tree, minModuleSize=3,
                                   deepSplit=TRUE)
 
-## --------------------
+## -------------Dataset 4 ----------------------------------------------------------------
 rm(list = ls()); gc()
 load("coexpr4.Rda")
 adjMatrix = get.adjacency(coexpr4_igraph, attr = "weight")
@@ -49,7 +73,7 @@ wgcna_modules = cutreeDynamicTree(dendro=gene_tree, minModuleSize=3,
                                   deepSplit=TRUE)
 table(table(wgcna_modules))
 
-## --------------------
+## -------------Dataset 5 ----------------------------------------------------------------
 rm(list = ls()); gc()
 load("cancer5.Rda")
 adjMatrix = get.adjacency(cancer5_igraph, attr = "weight")
@@ -59,7 +83,7 @@ wgcna_modules = cutreeDynamicTree(dendro=gene_tree, minModuleSize=3,
                                   deepSplit=TRUE)
 table(table(wgcna_modules))
 
-## --------------------
+## -------------Dataset 6 ----------------------------------------------------------------
 
 load("homology6.Rda")
 # get adjacency matrix of type dgCMatrix

@@ -40,6 +40,8 @@ getAllSubgraphs = function(igraphObject = NULL,
   return(list_of_all_subgraphs)
 }
 
+
+
 # get subgraph sizes given a list of subgraphs
 # to run this on clique: step 1: call getMaximalClique, step 2: call getAllSubgraphs
 # step 3: call this function

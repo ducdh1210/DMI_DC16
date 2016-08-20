@@ -4,7 +4,7 @@
 # https://www.synapse.org/#!Synapse:syn6156761/wiki/400652
 
 #### ---------------- load library -------------------------------------------------
-library('gplots'); library('ggplot2'); library('WGCNA'); library('igraph')
+library('ggplot2'); library('WGCNA'); library('igraph')
 library('clue'); library('ProNet')
 #### ---------------- load saved image --------------------------------------------
 setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
@@ -18,6 +18,7 @@ load("ppi2_clique_objects.rda")
 
 
 #save(ppi2_fastgreedy, ppi2_walktrap, ppi2_labelPropagation, ppi2_infomap, ppi2_louvain, ppi2_multilevel, file = "ppi2_communities.rda")
+
 # #### ---------------- import file -------------------------------------------------
 setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
 rm(list = ls())
@@ -39,6 +40,14 @@ pp2_igraph = graph.data.frame(d = temp_pp2, directed = F);
 #pp2_igraph = graph.data.frame(d = temp_pp2, directed = T);
 rm(temp_pp2)
 
+#### ---------------- COMPARE RESULT ------------------------------------------------------
+
+
+igraph::compare(comm1 = ppi2_fastgreedy, comm2 = ppi2_fastgreedy, method = "adjusted.rand")
+igraph::compare(comm1 = ppi2_fastgreedy, comm2 = ppi2_louvain, method = "adjusted.rand") # 0.1405325
+mclust::adjustedRandIndex(ppi2_fastgreedy$membership, ppi2_louvain$membership) # 0.1405325
+
+
 #### ---------------- WCGNA -------------------------------------------
 
 pp2_edgeList = get.edgelist(pp2_igraph)
@@ -56,7 +65,8 @@ pp2_adjM = as.matrix(pp2_adjMatrix)
 # For input, we use the reciprocal of the adjacency matrix; hierarchical
 # clustering works by comparing the _distance_ between objects instead of the
 # _similarity_.
-ppi2_gene_tree = hclust(as.dist(1 - pp2_adjM), method="average")
+ppi2_gene_tree = hclust(as.dist(1 - pp2_adjM), method="average") # taking much memory here
+
 
 
 gc()
@@ -65,6 +75,10 @@ gc()
 ppi2_wgcna_modules = cutreeDynamicTree(dendro=ppi2_gene_tree, minModuleSize=3,
                                        deepSplit=TRUE)
 gc()
+
+names(ppi2_wgcna_modules) = V(pp2_igraph)$name
+modularity(x = pp2_igraph, membership = ppi2_wgcna_modules, weights = E(pp2_igraph)$weight)
+
 # assign a color to each module for easier visualization and referencing
 module_colors = labels2colors(ppi2_wgcna_modules);
 
@@ -74,6 +88,8 @@ V(pp2_igraph)$color = col2hex(module_colors)
 
 file_name = "/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/subchallenge1_ppi2.graphml"
 write.graph(graph = pp2_igraph, file = file_name, format='graphml') # able to display in Cytoscape
+
+
 
 #### ---------------- MCODE ---------------------------------------------------------------
 library(ProNet)
@@ -345,9 +361,76 @@ max(membership(test))
 test2 = getAllSubgraphs(igraphObject = ppi2_combined_alone_vertices_graph,communityObject = test) 
 getCommunityWeightedStat(list_of_subgraphs = test2)
 
+# --------------------------- divide big graph into small graphs -----------------
+
+# remove small subgraphs out of the big graph
+ppi2_connected_components = components(pp2_igraph)
+ppi2_main_nodes = names(ppi2_connected_components$membership[which(ppi2_connected_components$membership == 1)])
+ppi2_main_graph = induced_subgraph(pp2_igraph, vids = ppi2_main_nodes)
+vcount(ppi2_main_graph) # 12325
+ecount(ppi2_main_graph) # 397253
+hist(E(ppi2_main_graph)$weight)
+plot(density(E(ppi2_main_graph)$weight))
+
+# apply louvain on the subgraphs 
+ppi2_main_graph_louvain = cluster_louvain(graph = ppi2_main_graph, 
+                                          weights = E(ppi2_main_graph)$weight )
+modularity(ppi2_main_graph_louvain) # 0.4958938
+
+table(ppi2_main_graph_louvain$membership)
+# 1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17   18   19 
+# 1534  669  155 1620  403  100  654  707  846 1313 1717  145    5    3  143  937  183  346  845 
+
+# which clusters have more than 100 memberships
+which(table(ppi2_main_graph_louvain$membership) > 100)
+
+ppi2_louvain_subgraphs = getAllSubgraphs(igraphObject = ppi2_main_graph, 
+                                         communityObject = ppi2_main_graph_louvain)
 
 
+list_of_graphs = ppi2_louvain_subgraphs
+global_list = list()
+global_good_list = list()
+list_of_big_graphs = list()
 
+# get inital list of big graphs
+for (i in 1:length(list_of_graphs)){
+  if (vcount(list_of_graphs[[i]]) > 100){
+    list_of_big_graphs <<- list.append(list_of_big_graphs, list_of_graphs[[i]])
+  }
+}
+
+divide_subgraph = function(list_of_big_graphs = NULL){
+  if (length(list_of_big_graphs) == 0){
+    #print("life is good so far, back to the future now")
+    return();
+  }
+  if (is.null(list_of_graphs)){
+    #print("should be printed at some point")
+    return()
+  }else{
+    for(i in 1:length(list_of_big_graphs)){
+      graph = list_of_big_graphs[[i]]
+      subgraph_louvain = cluster_louvain(graph)
+      subgraph_membership = subgraph_louvain$membership
+      list_of_subgraphs = getAllSubgraphs2(igraphObject = graph,membership = subgraph_membership)
+      new_list_of_big_graphs = list()
+      for (j in 1:length(list_of_subgraphs)){
+        if (vcount(list_of_subgraphs[[j]]) < 100){
+          global_good_list <<- list.append(global_good_list, list_of_subgraphs[[j]])
+          #print(paste("i is: ", i, " j is: ",j,  " -- small graph"))
+        }else{
+          new_list_of_big_graphs = list.append(new_list_of_big_graphs, list_of_subgraphs[[j]])
+          #print(paste("i is: ", i, " j is: ",j,  " -- big graph"))
+        }
+      }
+      divide_subgraph(new_list_of_big_graphs)
+    }
+  }
+}
+
+divide_subgraph(list_of_big_graphs)
+global_good_list
 
 
 
