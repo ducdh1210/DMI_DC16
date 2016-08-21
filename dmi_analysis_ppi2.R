@@ -4,12 +4,15 @@
 # https://www.synapse.org/#!Synapse:syn6156761/wiki/400652
 
 #### ---------------- load library -------------------------------------------------
-library('ggplot2'); library('WGCNA'); library('igraph')
-library('clue'); library('ProNet')
+library('rlist') 
+library('WGCNA') 
+library('igraph')
+library('clue') 
+library('ProNet')
 #### ---------------- load saved image --------------------------------------------
 setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
-source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/graph_utility_functions.R")
 rm(list = ls());  gc();
+source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/graph_utility_functions.R")
 
 #load("PPI2.RData")
 load("ppi2_igraph.rda")
@@ -365,6 +368,9 @@ getCommunityWeightedStat(list_of_subgraphs = test2)
 
 # remove small subgraphs out of the big graph
 ppi2_connected_components = components(pp2_igraph)
+table(table(ppi2_connected_components$membership))
+# 2     3     4 12325 
+# 33     7     2     1 
 ppi2_main_nodes = names(ppi2_connected_components$membership[which(ppi2_connected_components$membership == 1)])
 ppi2_main_graph = induced_subgraph(pp2_igraph, vids = ppi2_main_nodes)
 vcount(ppi2_main_graph) # 12325
@@ -389,7 +395,6 @@ ppi2_louvain_subgraphs = getAllSubgraphs(igraphObject = ppi2_main_graph,
 
 
 list_of_graphs = ppi2_louvain_subgraphs
-global_list = list()
 global_good_list = list()
 list_of_big_graphs = list()
 
@@ -401,19 +406,15 @@ for (i in 1:length(list_of_graphs)){
 }
 
 divide_subgraph = function(list_of_big_graphs = NULL){
+  # base case in the recursion: no more element in the list, just return
   if (length(list_of_big_graphs) == 0){
-    #print("life is good so far, back to the future now")
     return();
-  }
-  if (is.null(list_of_graphs)){
-    #print("should be printed at some point")
-    return()
   }else{
     for(i in 1:length(list_of_big_graphs)){
       graph = list_of_big_graphs[[i]]
       subgraph_louvain = cluster_louvain(graph)
       subgraph_membership = subgraph_louvain$membership
-      list_of_subgraphs = getAllSubgraphs2(igraphObject = graph,membership = subgraph_membership)
+      list_of_subgraphs = getAllSubgraphsFromMemebership(igraphObject = graph,membership = subgraph_membership)
       new_list_of_big_graphs = list()
       for (j in 1:length(list_of_subgraphs)){
         if (vcount(list_of_subgraphs[[j]]) < 100){
@@ -432,6 +433,12 @@ divide_subgraph = function(list_of_big_graphs = NULL){
 divide_subgraph(list_of_big_graphs)
 global_good_list
 
+# remove all list elements whose size < 3
+good_list_size = sapply(global_good_list, function(module) vcount(module))
+index_to_be_removed = which(good_list_size < 3)
+global_good_list = global_good_list[-index_to_be_removed]
+
+# test modularity of the membership assignment
 
 
 

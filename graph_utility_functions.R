@@ -40,6 +40,14 @@ getAllSubgraphs = function(igraphObject = NULL,
   return(list_of_all_subgraphs)
 }
 
+getAllSubgraphsFromMemebership = function(igraphObject = NULL, membership = NULL){
+  list_of_all_subgraphs = list()
+  for (i in sort(unique(membership))){
+    list_of_all_subgraphs[[i]] = induced.subgraph(igraphObject,
+                                                  which(membership==i))
+  }
+  return(list_of_all_subgraphs)
+}
 
 
 # get subgraph sizes given a list of subgraphs
