@@ -9,6 +9,7 @@ library('WGCNA')
 library('igraph')
 library('clue') 
 library('ProNet')
+library('reshape')
 #### ---------------- load saved image --------------------------------------------
 setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
 rm(list = ls());  gc();
@@ -390,18 +391,23 @@ table(ppi2_main_graph_louvain$membership)
 # which clusters have more than 100 memberships
 which(table(ppi2_main_graph_louvain$membership) > 100)
 
-ppi2_louvain_subgraphs = getAllSubgraphs(igraphObject = ppi2_main_graph, 
-                                         communityObject = ppi2_main_graph_louvain)
+ppi2_louvain_subgraphs = getAllSubgraphsFromMemebership(igraphObject = ppi2_main_graph, 
+                                         membership = ppi2_main_graph_louvain$membership)
 
 
 list_of_graphs = ppi2_louvain_subgraphs
 global_good_list = list()
+list_of_small_graph = list()
 list_of_big_graphs = list()
 
-# get inital list of big graphs
+# doing 2 things
+# 1: get inital list of big graphs
+# 2: add small list into the result class
 for (i in 1:length(list_of_graphs)){
   if (vcount(list_of_graphs[[i]]) > 100){
     list_of_big_graphs <<- list.append(list_of_big_graphs, list_of_graphs[[i]])
+  }else if(vcount(list_of_graphs[[i]]) > 2){
+    global_good_list <<- list.append(global_good_list, list_of_graphs[[i]])
   }
 }
 
@@ -417,7 +423,7 @@ divide_subgraph = function(list_of_big_graphs = NULL){
       list_of_subgraphs = getAllSubgraphsFromMemebership(igraphObject = graph,membership = subgraph_membership)
       new_list_of_big_graphs = list()
       for (j in 1:length(list_of_subgraphs)){
-        if (vcount(list_of_subgraphs[[j]]) < 100){
+        if (vcount(list_of_subgraphs[[j]]) <= 100){
           global_good_list <<- list.append(global_good_list, list_of_subgraphs[[j]])
           #print(paste("i is: ", i, " j is: ",j,  " -- small graph"))
         }else{
@@ -439,10 +445,16 @@ index_to_be_removed = which(good_list_size < 3)
 global_good_list = global_good_list[-index_to_be_removed]
 
 # test modularity of the membership assignment
+global_good_list_node_names = lapply(global_good_list, function(module) names(V(module)))
+module_assignment = melt(global_good_list_node_names)
+membership = module_assignment$L1
+names(membership) = module_assignment$value
 
+# reorder
+name_order = V(ppi2_main_graph)$name
+membership = membership[name_order]
 
-
-
+modularity(ppi2_main_graph, membership = membership, weights = E(ppi2_main_graph)$weights )
 
 
 
