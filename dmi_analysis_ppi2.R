@@ -372,30 +372,36 @@ ppi2_connected_components = components(pp2_igraph)
 table(table(ppi2_connected_components$membership))
 # 2     3     4 12325 
 # 33     7     2     1 
-ppi2_main_nodes = names(ppi2_connected_components$membership[which(ppi2_connected_components$membership == 1)])
+
+# groups of at least 3 connected components 
+selected_connected_component_groups = unname(which(table(ppi2_connected_components$membership) >= 3))
+# select the node names in from those above groups 
+ppi2_main_nodes = names(ppi2_connected_components$membership[
+  which(ppi2_connected_components$membership %in% selected_connected_component_groups)])
+# create the subgraph out the the above nodes 
 ppi2_main_graph = induced_subgraph(pp2_igraph, vids = ppi2_main_nodes)
-vcount(ppi2_main_graph) # 12325
-ecount(ppi2_main_graph) # 397253
-hist(E(ppi2_main_graph)$weight)
-plot(density(E(ppi2_main_graph)$weight))
+# vcount(ppi2_main_graph) 
+# ecount(ppi2_main_graph) 
+# hist(E(ppi2_main_graph)$weight)
+# plot(density(E(ppi2_main_graph)$weight))
 
 # apply louvain on the subgraphs 
 ppi2_main_graph_louvain = cluster_louvain(graph = ppi2_main_graph, 
                                           weights = E(ppi2_main_graph)$weight )
-modularity(ppi2_main_graph_louvain) # 0.4958938
+# modularity(ppi2_main_graph_louvain) # 0.4959873
 
-table(ppi2_main_graph_louvain$membership)
+# table(ppi2_main_graph_louvain$membership)
 # 1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17   18   19 
 # 1534  669  155 1620  403  100  654  707  846 1313 1717  145    5    3  143  937  183  346  845 
 
 # which clusters have more than 100 memberships
-which(table(ppi2_main_graph_louvain$membership) > 100)
+# which(table(ppi2_main_graph_louvain$membership) > 100)
 
-ppi2_louvain_subgraphs = getAllSubgraphsFromMemebership(igraphObject = ppi2_main_graph, 
+# create list of graphs 
+list_of_graphs = getAllSubgraphsFromMemebership(igraphObject = ppi2_main_graph, 
                                          membership = ppi2_main_graph_louvain$membership)
 
-
-list_of_graphs = ppi2_louvain_subgraphs
+# create lists to retain and manipulate results
 global_good_list = list()
 list_of_small_graph = list()
 list_of_big_graphs = list()
@@ -411,6 +417,8 @@ for (i in 1:length(list_of_graphs)){
   }
 }
 
+# routine to recursively divide big graphs (>100) into smaller graphs until all the graphs 
+# have size < 100; those eligible small graphs will be added into the result list (global_good_list) 
 divide_subgraph = function(list_of_big_graphs = NULL){
   # base case in the recursion: no more element in the list, just return
   if (length(list_of_big_graphs) == 0){
@@ -420,7 +428,7 @@ divide_subgraph = function(list_of_big_graphs = NULL){
       graph = list_of_big_graphs[[i]]
       subgraph_louvain = cluster_louvain(graph)
       subgraph_membership = subgraph_louvain$membership
-      list_of_subgraphs = getAllSubgraphsFromMemebership(igraphObject = graph,membership = subgraph_membership)
+      list_of_subgraphs = getAllSubgraphsFromMembership(igraphObject = graph,membership = subgraph_membership)
       new_list_of_big_graphs = list()
       for (j in 1:length(list_of_subgraphs)){
         if (vcount(list_of_subgraphs[[j]]) <= 100){
@@ -437,24 +445,27 @@ divide_subgraph = function(list_of_big_graphs = NULL){
 }
 
 divide_subgraph(list_of_big_graphs)
-global_good_list
+# global_good_list
 
-# remove all list elements whose size < 3
+# there will be some graphs whose size < 3, remove those graphs
 good_list_size = sapply(global_good_list, function(module) vcount(module))
 index_to_be_removed = which(good_list_size < 3)
 global_good_list = global_good_list[-index_to_be_removed]
 
-# test modularity of the membership assignment
+# use reshape::melt to create membership vector
 global_good_list_node_names = lapply(global_good_list, function(module) names(V(module)))
 module_assignment = melt(global_good_list_node_names)
 membership = module_assignment$L1
 names(membership) = module_assignment$value
 
-# reorder
-name_order = V(ppi2_main_graph)$name
+# since we create some graphs whose size < 3 (implying we removed some nodes, need to create a new induced graph)
+# in order to test the modularity
+induced_graph_from_main = induced_subgraph(graph = ppi2_main_graph, 
+                                           vids = names(membership))
+name_order = V(induced_graph_from_main)$name
 membership = membership[name_order]
 
-modularity(ppi2_main_graph, membership = membership, weights = E(ppi2_main_graph)$weights )
+modularity(induced_graph_from_main, membership = membership, weights = E(induced_graph_from_main)$weights ) # 0.1396317
 
 
 
