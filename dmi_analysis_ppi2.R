@@ -366,40 +366,62 @@ test2 = getAllSubgraphs(igraphObject = ppi2_combined_alone_vertices_graph,commun
 getCommunityWeightedStat(list_of_subgraphs = test2)
 
 # --------------------------- divide big graph into small graphs -----------------
+rm(list = ls());  gc();
+setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
+source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/graph_utility_functions.R")
+# load all graphs from 6 datasets
+load("ppi1.Rda")
+load("ppi2_igraph.rda")
+load("signaling3.Rda")
+load("coexpr4.Rda")
+load("cancer5.Rda")
+load("homology6.Rda")
+# load libraries
+library('igraph'); library('rlist'); library('reshape')
+library('WGCNA'); library('clue'); library('ProNet')
+
+# set this to increase the recursion depth
+options(expressions = 50000) # default value is 5000
+
+# graph to work with
+graph = signaling3_igraph
 
 # remove small subgraphs out of the big graph
-ppi2_connected_components = components(pp2_igraph)
-table(table(ppi2_connected_components$membership))
+connected_components = components(graph)
+
+#table(table(connected_components$membership))
 # 2     3     4 12325 
 # 33     7     2     1 
 
 # groups of at least 3 connected components 
-selected_connected_component_groups = unname(which(table(ppi2_connected_components$membership) >= 3))
+selected_connected_component_groups = unname(which(table(connected_components$membership) >= 3))
 # select the node names in from those above groups 
-ppi2_main_nodes = names(ppi2_connected_components$membership[
-  which(ppi2_connected_components$membership %in% selected_connected_component_groups)])
+main_nodes = names(connected_components$membership[
+  which(connected_components$membership %in% selected_connected_component_groups)])
 # create the subgraph out the the above nodes 
-ppi2_main_graph = induced_subgraph(pp2_igraph, vids = ppi2_main_nodes)
-# vcount(ppi2_main_graph) 
-# ecount(ppi2_main_graph) 
-# hist(E(ppi2_main_graph)$weight)
-# plot(density(E(ppi2_main_graph)$weight))
+main_graph = induced_subgraph(graph, vids = main_nodes)
+# vcount(main_graph) 
+# ecount(main_graph) 
+# hist(E(main_graph)$weight)
+# plot(density(E(main_graph)$weight))
 
 # apply louvain on the subgraphs 
-ppi2_main_graph_louvain = cluster_louvain(graph = ppi2_main_graph, 
-                                          weights = E(ppi2_main_graph)$weight )
-# modularity(ppi2_main_graph_louvain) # 0.4959873
+# main_graph_communities = cluster_louvain(graph = main_graph,
+#                                           weights = E(main_graph)$weight )
+main_graph_communities = cluster_infomap(graph = main_graph,
+                                         e.weights = E(main_graph)$weight )
+# modularity(main_graph_communities) # 0.4959873
 
-# table(ppi2_main_graph_louvain$membership)
+# table(main_graph_communities$membership)
 # 1    2    3    4    5    6    7    8    9   10   11   12   13   14   15   16   17   18   19 
 # 1534  669  155 1620  403  100  654  707  846 1313 1717  145    5    3  143  937  183  346  845 
 
 # which clusters have more than 100 memberships
-# which(table(ppi2_main_graph_louvain$membership) > 100)
+# which(table(main_graph_communities$membership) > 100)
 
 # create list of graphs 
-list_of_graphs = getAllSubgraphsFromMemebership(igraphObject = ppi2_main_graph, 
-                                         membership = ppi2_main_graph_louvain$membership)
+list_of_graphs = getAllSubgraphsFromMembership(igraphObject = main_graph, 
+                                         membership = main_graph_communities$membership)
 
 # create lists to retain and manipulate results
 global_good_list = list()
@@ -426,15 +448,17 @@ divide_subgraph = function(list_of_big_graphs = NULL){
   }else{
     for(i in 1:length(list_of_big_graphs)){
       graph = list_of_big_graphs[[i]]
-      subgraph_louvain = cluster_louvain(graph)
+      # subgraph_louvain = cluster_louvain(graph = graph, weights = E(graph)$weight)
+       subgraph_louvain = cluster_infomap(graph = graph, e.weights = E(graph)$weight)
       subgraph_membership = subgraph_louvain$membership
       list_of_subgraphs = getAllSubgraphsFromMembership(igraphObject = graph,membership = subgraph_membership)
       new_list_of_big_graphs = list()
       for (j in 1:length(list_of_subgraphs)){
+        # if the graph's size < 100 --> add it into the good list
         if (vcount(list_of_subgraphs[[j]]) <= 100){
           global_good_list <<- list.append(global_good_list, list_of_subgraphs[[j]])
           #print(paste("i is: ", i, " j is: ",j,  " -- small graph"))
-        }else{
+        }else{ # if the graph's size > 100 --> add it into the big graph list to divide later
           new_list_of_big_graphs = list.append(new_list_of_big_graphs, list_of_subgraphs[[j]])
           #print(paste("i is: ", i, " j is: ",j,  " -- big graph"))
         }
@@ -447,7 +471,7 @@ divide_subgraph = function(list_of_big_graphs = NULL){
 divide_subgraph(list_of_big_graphs)
 # global_good_list
 
-# there will be some graphs whose size < 3, remove those graphs
+# there will be some graphs whose size < 3, thus remove those graphs from the list
 good_list_size = sapply(global_good_list, function(module) vcount(module))
 index_to_be_removed = which(good_list_size < 3)
 global_good_list = global_good_list[-index_to_be_removed]
@@ -458,16 +482,18 @@ module_assignment = melt(global_good_list_node_names)
 membership = module_assignment$L1
 names(membership) = module_assignment$value
 
-# since we create some graphs whose size < 3 (implying we removed some nodes, need to create a new induced graph)
-# in order to test the modularity
-induced_graph_from_main = induced_subgraph(graph = ppi2_main_graph, 
+# since we have removed some graphs whose size < 3 
+# (implying we removed some nodes), thus we need to create a new induced graph 
+# from the retained nodes in order to test the modularity
+induced_graph_from_main = induced_subgraph(graph = main_graph, 
                                            vids = names(membership))
 name_order = V(induced_graph_from_main)$name
 membership = membership[name_order]
 
-modularity(induced_graph_from_main, membership = membership, weights = E(induced_graph_from_main)$weights ) # 0.1396317
+# modularity(induced_graph_from_main, membership = membership, weights = E(induced_graph_from_main)$weights) # 0.1396317
+# save(membership, file = "result/signal3_infomap.rda")
 
-
+# --------------------------- divide big graph into small graphs (wgcna) -----------------
 
 
 

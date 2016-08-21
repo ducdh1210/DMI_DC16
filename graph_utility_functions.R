@@ -40,7 +40,7 @@ getAllSubgraphs = function(igraphObject = NULL,
   return(list_of_all_subgraphs)
 }
 
-getAllSubgraphsFromMemebership = function(igraphObject = NULL, membership = NULL){
+getAllSubgraphsFromMembership = function(igraphObject = NULL, membership = NULL){
   list_of_all_subgraphs = list()
   for (i in sort(unique(membership))){
     list_of_all_subgraphs[[i]] = induced.subgraph(igraphObject,
