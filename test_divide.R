@@ -125,15 +125,8 @@ decomposeGraphsInList(louvain_list_of_graphs) # worked!
 list_of_connected_big_graphs
 size = sapply(list_of_connected_big_graphs, function(e) vcount(e)); size
 
-
-#### test code
-test = list_of_connected_big_graphs[[2]]
-
 # if the big-graph has odd node, remove 1 node whose edge from it has smallest weight
 
-if (vcount(test) %% 2 == 1){
-  test = removeOneNode(test)
-}
 
 removeOneNode = function(igraphObject){
   node_to_removed = names(sort(degree(igraphObject), decreasing = F)[1])
@@ -142,11 +135,87 @@ removeOneNode = function(igraphObject){
   return(graph)
 }
 
+# https://www.r-bloggers.com/graph-bisection-in-r/
+## Approximate bisection
+# returns a bisection of the graph that minimizes the cost using Kernighan/Lin Algorithm
+# http://www.eecs.berkeley.edu/~demmel/cs267/lecture18/lecture18.html#link_4.2
+# partition<-approximateBisection(weightMatrix)
+# weightMatrix is symmetric matrix of size 2Nx2N made of non-negative values.
+# partition is a list of two vectors of N indices.
+# C.Ladroue
 
-# -------------- main loop function ---------------------------------------------
-
-for (i in 1:length(list_of_connected_big_graphs)){
-  recursiveBisection(list_of_connected_big_graphs[[i]])
+approximateBisection<-function(weightMatrix,mode="matrix",minimumGain=1e-5){
+  #   minimumGain<-1e-5 # minimum value for gain, setting it to 0 might lead to infinite loop due to numerical inaccuracy
+  
+  N<-dim(weightMatrix)[1] # number of elements
+  m<-N/2
+  
+  # start off with a random partition
+  A<-sample(1:N,N/2,replace=FALSE)
+  B<-(1:N)[-A]
+  
+  maxGain<-Inf
+  while(maxGain>minimumGain){
+    DA<-rowSums(weightMatrix[A,B])-rowSums(weightMatrix[A,A])+diag(weightMatrix[A,A])
+    DB<-rowSums(weightMatrix[B,A])-rowSums(weightMatrix[B,B])+diag(weightMatrix[B,B])
+    unmarkedA<-1:m
+    unmarkedB<-1:m
+    markedA<-rep(0,m)
+    markedB<-rep(0,m)
+    gains<-rep(0,m)
+    for(k in 1:m){
+      # find best pair from remainder
+      # with 2 loops, slow but easy on memory
+      if(mode=='2loops'){
+        bestGain<--Inf
+        besti<-0
+        bestj<-0
+        for(i in unmarkedA)
+          for(j in unmarkedB){
+            gain<-DA[i]+DB[j]-2*weightMatrix[A[i],B[j]]
+            if(gain>bestGain) {bestGain<-gain; besti<-i;bestj<-j}
+          }
+        #           mark the best pair
+        unmarkedA<-unmarkedA[-which(unmarkedA==besti)]
+        unmarkedB<-unmarkedB[-which(unmarkedB==bestj)]
+        markedA[k]<-besti
+        markedB[k]<-bestj
+      }              
+      # with one matrix, much faster but builds a matrix as large as weightMatrix
+      if(mode=='matrix'){
+        dimension<-m+1-k
+        fasterGain<-matrix(DA[unmarkedA],nrow=dimension,ncol=dimension,byrow=FALSE)+
+          matrix(DB[unmarkedB],nrow=dimension,ncol=dimension,byrow=TRUE)-
+          2*weightMatrix[A[unmarkedA],B[unmarkedB]]
+        # mark the best pair
+        best<-arrayInd(which.max(fasterGain),.dim=c(dimension,dimension))
+        besti<-unmarkedA[best[1]]
+        bestj<-unmarkedB[best[2]]
+        bestGain<-fasterGain[best]
+        markedA[k]<-unmarkedA[best[1]]
+        markedB[k]<-unmarkedB[best[2]]
+        unmarkedA<-unmarkedA[-best[1]]
+        unmarkedB<-unmarkedB[-best[2]]
+      }
+      # record gain
+      gains[k]<-bestGain
+      
+      # update D for unmarked indices 
+      DA[unmarkedA]<-DA[unmarkedA]+2*weightMatrix[A[unmarkedA],A[besti]]-2*weightMatrix[A[unmarkedA],B[bestj]]
+      DB[unmarkedB]<-DB[unmarkedB]+2*weightMatrix[B[unmarkedB],B[bestj]]-2*weightMatrix[B[unmarkedB],A[besti]]
+    }
+    gains<-cumsum(gains)
+    bestPartition<-which.max(gains)
+    maxGain<-gains[bestPartition]
+    if(maxGain>minimumGain){ 
+      # swap best pairs
+      A1<-c(A[-markedA[1:bestPartition]],B[markedB[1:bestPartition]])
+      B1<-c(B[-markedB[1:bestPartition]],A[markedA[1:bestPartition]])
+      A<-A1
+      B<-B1
+    }
+  }
+  list(A,B)
 }
 
 # -------------------------------------------------------------------------------
@@ -209,12 +278,15 @@ recursiveBisection = function(igraphObject){
 }
 
 
-global_good_list = list()
-recursiveBisection(list_of_connected_big_graphs[[4]])
+ptm = proc.time()
+# recursiveBisection(list_of_connected_big_graphs[[4]])
+for (i in 1:length(list_of_connected_big_graphs)){
+  recursiveBisection(list_of_connected_big_graphs[[i]])
+}
+ptm = proc.time() - ptm
 
-
-
-
+global_good_list
+save(global_good_list, file = "result/ppi1_result.rda")
 
 # --------------------------------------------------------------------------------------
 

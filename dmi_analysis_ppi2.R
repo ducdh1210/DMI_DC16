@@ -10,6 +10,7 @@ library('igraph')
 library('clue') 
 library('ProNet')
 library('reshape')
+library('flashClust')
 #### ---------------- load saved image --------------------------------------------
 setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
 rm(list = ls());  gc();
@@ -369,22 +370,24 @@ getCommunityWeightedStat(list_of_subgraphs = test2)
 rm(list = ls());  gc();
 setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
 source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/graph_utility_functions.R")
+source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/divide_subgraph.R")
+
 # load all graphs from 6 datasets
 load("ppi1.Rda")
-load("ppi2_igraph.rda")
-load("signaling3.Rda")
-load("coexpr4.Rda")
-load("cancer5.Rda")
-load("homology6.Rda")
+# load("ppi2_igraph.rda")
+# load("signaling3.Rda")
+# load("coexpr4.Rda")
+# load("cancer5.Rda")
+# load("homology6.Rda")
 # load libraries
 library('igraph'); library('rlist'); library('reshape')
-library('WGCNA'); library('clue'); library('ProNet')
+#library('WGCNA'); library('clue'); library('ProNet')
 
 # set this to increase the recursion depth
-options(expressions = 50000) # default value is 5000
+options(expressions = 500000) # default value is 5000
 
 # graph to work with
-graph = signaling3_igraph
+graph = ppi1_igraph
 
 # remove small subgraphs out of the big graph
 connected_components = components(graph)
@@ -406,10 +409,10 @@ main_graph = induced_subgraph(graph, vids = main_nodes)
 # plot(density(E(main_graph)$weight))
 
 # apply louvain on the subgraphs 
-# main_graph_communities = cluster_louvain(graph = main_graph,
-#                                           weights = E(main_graph)$weight )
-main_graph_communities = cluster_infomap(graph = main_graph,
-                                         e.weights = E(main_graph)$weight )
+main_graph_communities = cluster_louvain(graph = main_graph,
+                                          weights = E(main_graph)$weight )
+# main_graph_communities = cluster_infomap(graph = main_graph,
+#                                          e.weights = E(main_graph)$weight )
 # modularity(main_graph_communities) # 0.4959873
 
 # table(main_graph_communities$membership)
@@ -439,34 +442,7 @@ for (i in 1:length(list_of_graphs)){
   }
 }
 
-# routine to recursively divide big graphs (>100) into smaller graphs until all the graphs 
-# have size < 100; those eligible small graphs will be added into the result list (global_good_list) 
-divide_subgraph = function(list_of_big_graphs = NULL){
-  # base case in the recursion: no more element in the list, just return
-  if (length(list_of_big_graphs) == 0){
-    return();
-  }else{
-    for(i in 1:length(list_of_big_graphs)){
-      graph = list_of_big_graphs[[i]]
-      # subgraph_louvain = cluster_louvain(graph = graph, weights = E(graph)$weight)
-       subgraph_louvain = cluster_infomap(graph = graph, e.weights = E(graph)$weight)
-      subgraph_membership = subgraph_louvain$membership
-      list_of_subgraphs = getAllSubgraphsFromMembership(igraphObject = graph,membership = subgraph_membership)
-      new_list_of_big_graphs = list()
-      for (j in 1:length(list_of_subgraphs)){
-        # if the graph's size < 100 --> add it into the good list
-        if (vcount(list_of_subgraphs[[j]]) <= 100){
-          global_good_list <<- list.append(global_good_list, list_of_subgraphs[[j]])
-          #print(paste("i is: ", i, " j is: ",j,  " -- small graph"))
-        }else{ # if the graph's size > 100 --> add it into the big graph list to divide later
-          new_list_of_big_graphs = list.append(new_list_of_big_graphs, list_of_subgraphs[[j]])
-          #print(paste("i is: ", i, " j is: ",j,  " -- big graph"))
-        }
-      }
-      divide_subgraph(new_list_of_big_graphs)
-    }
-  }
-}
+
 
 divide_subgraph(list_of_big_graphs)
 # global_good_list
@@ -493,10 +469,176 @@ membership = membership[name_order]
 # modularity(induced_graph_from_main, membership = membership, weights = E(induced_graph_from_main)$weights) # 0.1396317
 # save(membership, file = "result/signal3_infomap.rda")
 
+
+
+
+
+
+
+
+
+
+
 # --------------------------- divide big graph into small graphs (wgcna) -----------------
+rm(list = ls());  gc();
+setwd("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge")
+source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/graph_utility_functions.R")
+source("/media/ducdo/UUI/Bioinformatics/DMI_DreamChallenge/divide_subgraph.R")
+
+# load libraries
+library('igraph'); library('rlist'); library('reshape')
+library('WGCNA'); library('clue'); library('ProNet'); 
+# load all graphs from 6 datasets
+load("ppi1.Rda"); load("result/temp_wcgna_modules_ppi1.RData")
+# load("ppi2_igraph.rda")
+# load("signaling3.Rda")
+# load("coexpr4.Rda")
+# load("cancer5.Rda")
+# load("homology6.Rda")
+
+graph = ppi1_igraph 
+
+# remove small subgraphs out of the big graph
+connected_components = components(graph)
+
+#table(table(connected_components$membership))
+# 2     3     4 12325 
+# 33     7     2     1 
+
+# groups of at least 3 connected components 
+selected_connected_component_groups = unname(which(table(connected_components$membership) >= 3))
+
+# select the node names in from those above groups 
+main_nodes = names(connected_components$membership[
+  which(connected_components$membership %in% selected_connected_component_groups)])
+
+# create the subgraph out the the above nodes 
+main_graph = induced_subgraph(graph, vids = main_nodes)
+
+# get modules using wcgna
+wcgna_modules = get_wcgna_modules(igraphObject = main_graph)
+#save(wcgna_modules, file = "result/temp_wcgna_modules_ppi1.RData")
+
+table(table(wcgna_modules))
+
+# create list of graphs 
+list_of_graphs = getAllSubgraphsFromMembership2(igraphObject = main_graph, 
+                                               membership = wcgna_modules)
+
+# create lists to retain and manipulate results
+global_good_list = list()
+list_of_small_graph = list()
+list_of_big_graphs = list()
+
+gc()
+
+# doing 2 things
+# 1: get inital list of big graphs
+# 2: add small list into the result class
+for (i in 1:length(list_of_graphs)){
+  if (vcount(list_of_graphs[[i]]) > 100){
+    list_of_big_graphs <<- list.append(list_of_big_graphs, list_of_graphs[[i]])
+  }else if(vcount(list_of_graphs[[i]]) > 2){
+    global_good_list <<- list.append(global_good_list, list_of_graphs[[i]])
+  }
+}
+
+divide_subgraph(list_of_big_graphs)
 
 
 
 
 
+
+
+# ----------------------------------------------------------------------------------------
+
+getAllSubgraphsFromMembership2 = function(igraphObject = NULL, membership = NULL){
+  list_of_all_subgraphs = list()
+  for (i in sort(unique(membership))){
+    #print(as.character(names(which(membership==i))))
+    list_of_all_subgraphs[[i]] = induced.subgraph(graph = igraphObject,
+                                                  vids = as.character(names(which(membership==i))))
+  }
+  return(list_of_all_subgraphs)
+}
+
+
+
+# routine to recursively divide big graphs (>100) into smaller graphs until all the graphs 
+# have size < 100; those eligible small graphs will be added into the result list (global_good_list) 
+divide_subgraph = function(list_of_big_graphs = NULL){
+  # base case in the recursion: no more element in the list, just return
+  if (length(list_of_big_graphs) == 0){
+    return();
+  }else{
+    for(i in 1:length(list_of_big_graphs)){
+      graph = list_of_big_graphs[[i]]
+      subgraph_louvain = cluster_louvain(graph = graph, weights = E(graph)$weight)
+      #subgraph_louvain = cluster_infomap(graph = graph, e.weights = E(graph)$weight)
+      subgraph_membership = subgraph_louvain$membership
+      list_of_subgraphs = getAllSubgraphsFromMembership(igraphObject = graph,membership = subgraph_membership)
+      new_list_of_big_graphs = list()
+      for (j in 1:length(list_of_subgraphs)){
+        # if the graph's size < 100 --> add it into the good list
+        if (vcount(list_of_subgraphs[[j]]) <= 100){
+          global_good_list <<- list.append(global_good_list, list_of_subgraphs[[j]])
+          #print(paste("i is: ", i, " j is: ",j,  " -- small graph"))
+        }else{ # if the graph's size > 100 --> add it into the big graph list to divide later
+          new_list_of_big_graphs = list.append(new_list_of_big_graphs, list_of_subgraphs[[j]])
+          #print(paste("i is: ", i, " j is: ",j,  " -- big graph"))
+        }
+      }
+      divide_subgraph(new_list_of_big_graphs)
+    }
+  }
+}
+
+
+# routine to recursively divide big graphs (>100) into smaller graphs until all the graphs 
+# have size < 100; those eligible small graphs will be added into the result list (global_good_list) 
+divide_subgraph2 = function(list_of_big_graphs = NULL){
+  # base case in the recursion: no more element in the list, just return
+  if (length(list_of_big_graphs) == 0){
+    return();
+  }else{
+    for(i in 1:length(list_of_big_graphs)){
+      graph = list_of_big_graphs[[i]]
+      subgraph_membership = get_wcgna_modules(graph)
+      list_of_subgraphs = getAllSubgraphsFromMembership2(igraphObject = graph,
+                                                        membership = subgraph_membership)
+      new_list_of_big_graphs = list()
+      for (j in 1:length(list_of_subgraphs)){
+        # if the graph's size < 100 --> add it into the good list
+        if (vcount(list_of_subgraphs[[j]]) <= 100){
+          global_good_list <<- list.append(global_good_list, list_of_subgraphs[[j]])
+          #print(paste("i is: ", i, " j is: ",j,  " -- small graph"))
+        }else{ # if the graph's size > 100 --> add it into the big graph list to divide later
+          new_list_of_big_graphs = list.append(new_list_of_big_graphs, list_of_subgraphs[[j]])
+          #print(paste("i is: ", i, " j is: ",j,  " -- big graph"))
+        }
+      }
+      divide_subgraph2(new_list_of_big_graphs)
+    }
+  }
+}
+
+
+
+get_wcgna_modules = function(igraphObject){
+  # create adjancency matrix
+  adjMatrix = get.adjacency(igraphObject, attr = "weight"); gc(); 
+  adjM = as.matrix(adjMatrix); 
+  # adjM = adjM^8;
+  rm(adjMatrix); gc();
+  gene_tree = hclust(as.dist(1 - adjM), method="average"); 
+  rm(adjM); gc();
+  wgcna_modules = cutreeDynamicTree(dendro=gene_tree, 
+                                    minModuleSize=3,
+                                    deepSplit=TRUE)
+  wgcna_modules = wgcna_modules + 1
+  rm(gene_tree); gc();
+  names(wgcna_modules) = V(igraphObject)$name
+  return(wgcna_modules)
+}
 

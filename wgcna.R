@@ -39,7 +39,7 @@ adjMatrix = get.adjacency(pp2_igraph, attr = "weight")
 adjM = as.matrix(adjMatrix); gc()
 gene_tree = hclust(as.dist(1 - adjM), method="average"); gc()
 wgcna_modules = cutreeDynamicTree(dendro=gene_tree, 
-                                  minModuleSize=100,
+                                  minModuleSize=3,
                                   deepSplit=TRUE)
 
 names(wgcna_modules) = V(pp2_igraph)$name

@@ -173,11 +173,14 @@ getSubgraphStat = function(list_of_subgraphs, minVertexCount = 3){
   module_edge_count = sapply(list_of_subgraphs, function(subg) ecount(subg))
   module_densities = sapply(list_of_subgraphs, function(subg) graph.density(subg))
   module_clusCoeff = sapply(list_of_subgraphs, function(subg) transitivity(subg, type = "global"))
-  module_simmilarity = sapply(list_of_subgraphs, function(subg) mean(similarity(subg, method = "jaccard"))/2)
+  # module_simmilarity = sapply(list_of_subgraphs, function(subg) mean(similarity(subg, method = "jaccard"))/2)
+  
+  # stat = data.frame(vertex_count = module_vertex_count, edge_count = module_edge_count,
+  #                   density = module_densities, clusCoef = module_clusCoeff,
+  #                   avg_simmiliarity =  module_simmilarity)   
   
   stat = data.frame(vertex_count = module_vertex_count, edge_count = module_edge_count,
-                    density = module_densities, clusCoef = module_clusCoeff,
-                    avg_simmiliarity =  module_simmilarity)   
+                    density = module_densities, clusCoef = module_clusCoeff)  
   
   rownames(stat) = paste("M",1:nrow(stat),sep = "")
   
